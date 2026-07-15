@@ -1,0 +1,72 @@
+# ---- Dependencies ----
+node_modules/
+.pnp/
+.pnp.js
+
+# ---- Env / secrets ----
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# ---- Build output ----
+dist/
+build/
+out/
+.next/
+.turbo/
+*.tsbuildinfo
+
+# ---- Expo / React Native ----
+.expo/
+.expo-shared/
+web-build/
+*.jks
+*.p8
+*.p12
+*.mobileprovision
+*.orig.*
+apps/mobile/ios/
+apps/mobile/android/
+
+# ---- Native / tooling caches ----
+.gradle/
+.cxx/
+DerivedData/
+
+# ---- Supabase local ----
+infra/supabase/.branches/
+infra/supabase/.temp/
+infra/supabase/.env
+
+# ---- Media scratch (never commit user footage / temp transcodes) ----
+tmp/
+uploads/
+media-scratch/
+*.mp4
+*.mov
+*.m4a
+*.wav
+*.webm
+!docs/**/*.mp4
+
+# ---- Logs ----
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# ---- Coverage / test ----
+coverage/
+.nyc_output/
+
+# ---- OS / editor ----
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.recommended.json
+*.swp
