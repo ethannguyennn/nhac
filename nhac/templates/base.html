@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>{% block title %}{{ app_name }}{% endblock %}</title>
+    <meta name="theme-color" content="#0b0b0f" />
+    <link rel="stylesheet" href="/static/css/app.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <a class="brand" href="/">Nhạc<span class="brand-dot">·</span></a>
+      <a class="btn btn-accent btn-sm" href="/upload">＋ Upload</a>
+    </header>
+
+    {% if msg %}
+    <div class="flash" role="status">{{ msg }}</div>
+    {% endif %}
+
+    <main class="container">{% block content %}{% endblock %}</main>
+
+    <footer class="footer">
+      <p>For personal use. You’re responsible for the footage you upload and share.</p>
+    </footer>
+
+    {% block scripts %}{% endblock %}
+  </body>
+</html>

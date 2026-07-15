@@ -1,143 +1,121 @@
 # Workflows
 
-End-to-end pipelines, with the exact files/functions that implement each step.
-`TODO` marks glue that's stubbed in the scaffold.
+Pipelines with the exact modules/functions that implement each step.
+
+Legend: ✅ implemented & tested · 🟡 implemented, needs a real provider/key · ⛔ Phase 2.
 
 ---
 
-## 1. Upload → identify → organize (MVP core)
+## 1. Upload → identify → organize ✅
 
 ```
-CLIENT                         API                          EXTERNAL
-──────                         ───                          ────────
-pick video
-  │  POST /clips/uploads ─────▶ createUpload()
-  │                            • validate (zod)
-  │                            • make clipId + storage key
-  │                            • presign R2 PUT      ──────▶ Cloudflare R2
-  │  ◀── { clipId, uploadUrl } ┘  • TODO insert clip row (status=uploading)
-  │
-  │  PUT file ─────────────────────────────────────────────▶ R2 (raw/…)
-  │
-  │  POST /clips/uploads/complete ─▶ processClip(clipId)
-  │                                • status=processing
-  │                                • TODO download raw from R2
-  │                                • extractAudioSample() (ffmpeg) ─┐
-  │                                • fingerprint identify() ────────┼─▶ AudD/…
-  │                                • upsert Song, link Clip         │
-  │                                • write Recognition row          │
-  │                                • autoGroupIntoConcert()         │
-  │  ◀── 202 { identified } ───────┘  • status=identified|unidentified
-  │
-  └─ if !identified → prompt manual tag → POST /clips/:id/tag
+CLIENT                          APP
+──────                          ───
+pick video ──POST /upload─────▶ routers/web.upload_submit (or api.upload_clip)
+                                 └─ uploads.ingest_upload
+                                     • validate type/size
+                                     • storage.save_bytes(raw/<id>.ext)
+                                     • services.clips.create_clip
+                                     • run_in_threadpool(process_clip) ──┐
+                                                                          ▼
+                                 pipeline.process_clip (own DB session)
+                                   1 ffmpeg.probe            → duration/w/h
+                                   2 ffmpeg.extract_thumbnail→ thumbnails/<id>.jpg
+                                   3 ffmpeg.extract_audio_sample → audio/<id>.mp3
+                                   4 ffmpeg.estimate_audio_quality (best-effort)
+                                   5 fingerprint.identify(sample)
+                                   6 write Recognition row
+                                   7 if confident: upsert Song, link Clip,
+                                       status=identified, organize()
+                                     else: status=unidentified
+◀── redirect to concert / tag ──┘   (API: 201 + UploadResultOut)
 ```
 
-**Files:** `services/api/src/routes/clips.ts` → `pipeline/processClip.ts` →
-`providers/fingerprint/*` → `pipeline/organize.ts`. Audio via `lib/ffmpeg.ts`,
-storage via `lib/storage.ts`.
+**Decision gate:** accept only if `confidence ≥ MIN_MATCH_CONFIDENCE` (0.5,
+`constants.py`). Below → `unidentified` → manual tag. This is the
+~90%-not-100% philosophy in code.
 
-**Why a short sample?** We send ~15s (`FINGERPRINT_SAMPLE_SECONDS`) starting a
-few seconds in — cheaper per API call and skips the noisy intro. Tune in
-`packages/shared/src/constants.ts`.
+**Sample, not full track:** ~15s starting 5s in (`FINGERPRINT_SAMPLE_*`) —
+cheaper per API call, skips the noisy intro.
 
-**Decision gate:** accept the match only if
-`confidence ≥ MIN_MATCH_CONFIDENCE` (0.5). Below that → `unidentified` → manual
-tag. This is the ~90%-not-100% philosophy in code.
+Covered by `tests/test_upload_flow.py::test_upload_identifies_and_organizes`.
 
 ---
 
-## 2. Manual tagging fallback
+## 2. Manual tagging fallback ✅
 
 ```
 unidentified clip
-  → user types artist + title (client)
-  → POST /clips/:id/tag
+  → GET /clips/<id>/tag           (routers/web.tag_form)
+  → POST /clips/<id>/tag          (services.clips.apply_manual_tag)
       • upsert Song(artist, title)
-      • link clip (match_source = manual, status = manually_tagged)
-      • autoGroupIntoConcert(clip)
+      • link clip (match_source=manual, status=manually_tagged)
+      • organize() → concert + playlist
 ```
 
-Ensures every clip lands in a playlist even when fingerprinting misses. **File:**
-`clips.ts` `POST /:id/tag` (DB writes are TODO).
+Every clip lands somewhere even when fingerprinting misses. Covered by
+`test_upload_unidentified_then_manual_tag`.
 
 ---
 
-## 3. Auto-organization (grouping)
+## 3. Auto-organization (grouping) ✅
 
 ```
-identified/tagged clip
-  → autoGroupIntoConcert(clipId)
-      • find uploader's concert whose clips are within
-        CONCERT_GROUPING_WINDOW_MINUTES (6h) of this clip's recorded_at
-      • else create a new Concert (title from artist)
-      • set clip.concert_id
-      • ensure concert Playlist (type=concert) exists → add PlaylistItem
+identified / tagged clip
+  → pipeline.organize.auto_group_into_concert
+      • key = (uploader, artist, recorded date)
+      • find or create Concert
+      • ensure concert Playlist (services.playlists.ensure_concert_playlist)
+      • add PlaylistItem
 ```
 
-**File:** `pipeline/organize.ts`. Group-by-song within a concert is a read-time
-`GROUP BY song_id`. Phase 2 adds venue/geo + collaborative membership.
+Same-artist clips on the same day form one concert; a different day starts a new
+one. Phase 2 refines with venue/geo + collaborative membership.
 
 ---
 
-## 4. Playback
+## 4. Playback ✅
 
 ```
-GET /clips/:id → ClipWithSong + presigned playback URL (createPresignedDownload)
-client renders <Video> (expo-av / <video>) + warm visualizer behind it
+GET /clips/<id>  (routers/web.clip_player)
+  → <video src=media_url(raw_video_key)> + poster=thumbnail
+  → static/js/app.js draws an audio-reactive visualizer (Web Audio API)
 ```
 
-**Files:** `apps/mobile/app/player/[clipId].tsx`, `apps/web` grid (TODO),
-`lib/storage.ts` `createPresignedDownload()`.
+Local media is served by StaticFiles at `/media` with **HTTP range support**, so
+scrubbing works. Remote backends resolve to presigned/public URLs.
 
 ---
 
-## 5. Cleanest-audio selection (Phase 2)
+## 5. Cleanest-audio selection ⛔ (Phase 2)
 
-For a song with multiple contributed clips, pick the least-noisy audio as the
-primary track:
-
-```
-for each candidate clip:
-  ffmpeg: extract audio
-  estimateAudioQuality():
-    • volumedetect → mean/max volume, clipping
-    • high-frequency energy proxy → crowd-noise estimate
-    • combine → audio_quality_score (higher = cleaner)
-choose max(audio_quality_score) as the concert-song primary audio
-```
-
-**File:** `lib/ffmpeg.ts` `estimateAudioQuality()` (throws — not implemented).
-Persist to `clips.audio_quality_score`.
+Groundwork done: `audio/ffmpeg.estimate_audio_quality` scores each clip
+(volumedetect mean/peak; higher = cleaner) and stores
+`clips.audio_quality_score`. Next: for a song with multiple contributed clips,
+pick `max(audio_quality_score)` as the primary audio, and refine the heuristic
+with a high-frequency crowd-noise / SNR proxy.
 
 ---
 
-## 6. Multi-angle b-roll (Phase 2)
+## 6. Multi-angle b-roll ⛔ (Phase 2)
 
 ```
 inputs: N clips of the same concert-song
-audio:  the cleanest clip (workflow 5)
-video:  ffmpeg concat/xfade cutting between angles, synced to that audio
-output: single edited clip → R2 exports/… → shareable
+audio : the cleanest clip (workflow 5)
+video : ffmpeg concat/xfade across angles, synced to that audio → exports/
 ```
 
-Sync uses the fingerprint match offset (or a manual anchor) to align angles.
-This is the most complex Phase-2 item; prototype offline before wiring to UI.
+Most complex Phase-2 item; prototype offline before wiring to UI.
 
 ---
 
-## Status legend
-
-| Symbol | Meaning                                             |
-| ------ | --------------------------------------------------- |
-| ✅      | Implemented in scaffold                             |
-| 🟡     | Wired but stubbed (`TODO` in code)                  |
-| ⛔      | Phase 2 — intentionally not built yet               |
+## Status summary
 
 | Workflow                     | State |
 | ---------------------------- | ----- |
-| 1 Upload→identify→organize   | 🟡    |
-| 2 Manual tagging             | 🟡    |
-| 3 Auto-organization          | 🟡    |
-| 4 Playback                   | 🟡    |
-| 5 Cleanest-audio             | ⛔    |
+| 1 Upload→identify→organize   | ✅    |
+| 2 Manual tagging             | ✅    |
+| 3 Auto-organization          | ✅    |
+| 4 Playback + visualizer      | ✅    |
+| 5 Cleanest-audio             | ⛔ (scoring stubbed in) |
 | 6 Multi-angle b-roll         | ⛔    |

@@ -8,37 +8,33 @@
 Nhạc is for people replaying **their own recordings of concerts they attended**,
 for personal, non-commercial nostalgia and limited short-clip sharing. That's
 closer to personal use than redistribution — but recording a live performance
-still involves the performer's and songwriters' rights, so this is a genuine
-**gray area**, not a cleared one.
+still touches the performers' and songwriters' rights, so this is a genuine
+**gray area**, not cleared.
 
-## Guardrails we build in
+## Guardrails already in the code
 
-- **Personal-use disclaimer at the point of upload** (stubbed in the mobile
-  `upload` screen and web `App`): _"For personal use. You're responsible for the
-  footage you upload and share."_ Keep it visible.
-- **No mass-redistribution features.** No public firehose of full sets, no
-  "download anyone's full concert." Sharing is limited to **short highlight
-  clips** (Phase 2), which leans toward fair-use-ish territory.
-- **Private by default.** Clips are visible to the uploader (and invited concert
-  members in Phase 2), not the public. Enforced by RLS in `0002_rls.sql`.
-- **Fingerprint metadata only.** We use recognition to *label* a user's own clip
-  (artist/title), not to fetch or serve the original studio recording.
-- **Takedown-friendly.** Keep deletion simple (cascade deletes are in the schema)
-  so we can honor removal requests quickly.
+- **Personal-use disclaimer** shown on the upload page and in the footer:
+  _"For personal use. You're responsible for the footage you upload and share."_
+- **No mass-redistribution features.** No public firehose, no "download anyone's
+  full set." Sharing (Phase 2) is limited to short highlight clips.
+- **Private by design.** Single-user MVP; content isn't public. When multi-user
+  arrives, keep clips visible only to the uploader + invited concert members.
+- **Fingerprint = labeling only.** Recognition names a user's own clip; we never
+  fetch or serve the original studio recording.
+- **Easy deletion.** Cascade deletes in the schema make honoring takedowns simple.
 
 ## Third-party terms to review before launch
 
-- **Fingerprint provider ToS** (AudD/ACRCloud/AcoustID): confirm allowed use of
-  results, attribution, and rate/commercial terms.
-- **Social sharing APIs** (Instagram/TikTok, Phase 2): each has its own content
-  and API ToS for posting user media — review per platform before shipping
-  export.
-- **App stores:** Apple/Google both have UGC + copyright policy requirements
-  (report/takedown flow, moderation). Budget for a basic reporting mechanism.
+- **Fingerprint provider ToS** (AudD / AcoustID): allowed use of results,
+  attribution, rate/commercial terms.
+- **Social sharing APIs** (Instagram/TikTok, Phase 2): each platform's content +
+  API ToS for posting user media.
+- **App stores** (if you ship native): Apple/Google UGC + copyright policies
+  require a report/takedown flow.
 
 ## If this grows up
 
-Consider: a real Terms of Service + Privacy Policy, a DMCA/takedown process and
-registered agent, clearer messaging that users are responsible for their
-content, and legal review of any monetization (which weakens personal-use
-arguments). Revisit this doc before any public/commercial launch.
+Add a real Terms of Service + Privacy Policy, a DMCA/takedown process, clear
+"you're responsible for your content" messaging, and legal review of any
+monetization (which weakens the personal-use argument). Revisit before any
+public or commercial launch.

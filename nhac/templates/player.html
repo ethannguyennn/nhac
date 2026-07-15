@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}{{ clip.display_title }} · {{ app_name }}{% endblock %}
+{% block content %}
+<section class="player">
+  <div class="stage">
+    <canvas id="viz" class="viz"></canvas>
+    {% if clip.raw_video_key %}
+    <video
+      id="clip-video"
+      class="clip-video"
+      src="{{ media_url(clip.raw_video_key) }}"
+      {% if clip.thumbnail_key %}poster="{{ media_url(clip.thumbnail_key) }}"{% endif %}
+      controls
+      playsinline
+    ></video>
+    {% else %}
+    <div class="stage-empty">Media unavailable</div>
+    {% endif %}
+  </div>
+
+  <div class="now-playing">
+    <h1>{{ clip.display_title }}</h1>
+    <p class="muted">{{ clip.display_artist or "Unknown artist" }}</p>
+    {% if clip.match_source and clip.match_source.value == "fingerprint" %}
+    <p class="chip chip-ok">auto-identified{% if clip.match_confidence %} · {{ (clip.match_confidence * 100)|round|int }}%{% endif %}</p>
+    {% elif clip.match_source and clip.match_source.value == "manual" %}
+    <p class="chip">manually tagged</p>
+    {% endif %}
+    {% if clip.concert_id %}
+    <a class="btn btn-ghost btn-sm" href="/concerts/{{ clip.concert_id }}">← Back to concert</a>
+    {% endif %}
+    <a class="btn btn-ghost btn-sm" href="/clips/{{ clip.id }}/tag">Fix song info</a>
+  </div>
+</section>
+{% endblock %}
+{% block scripts %}
+<script src="/static/js/app.js"></script>
+<script>Nhac.initVisualizer();</script>
+{% endblock %}

@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}Tag song · {{ app_name }}{% endblock %}
+{% block content %}
+<section class="narrow">
+  <h1>Which song is this?</h1>
+  <p class="muted">
+    We couldn’t auto-detect it (crowd noise happens). Add the artist and title so
+    this clip finds its concert.
+  </p>
+
+  {% if clip.thumbnail_key %}
+  <div class="clip-thumb wide" style="background-image:url('{{ media_url(clip.thumbnail_key) }}')"></div>
+  {% endif %}
+
+  <form action="/clips/{{ clip.id }}/tag" method="post" class="stack">
+    <label class="field">
+      <span>Artist</span>
+      <input name="artist" type="text" required value="{{ clip.manual_artist or '' }}" placeholder="e.g. Phoenix" />
+    </label>
+    <label class="field">
+      <span>Song title</span>
+      <input name="title" type="text" required value="{{ clip.manual_title or '' }}" placeholder="e.g. Lisztomania" />
+    </label>
+    <label class="field">
+      <span>Album <span class="muted small">(optional)</span></span>
+      <input name="album" type="text" placeholder="" />
+    </label>
+    <button class="btn btn-accent btn-block" type="submit">Save &amp; organize</button>
+  </form>
+</section>
+{% endblock %}

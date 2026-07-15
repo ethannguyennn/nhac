@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block title %}{{ concert.title }} · {{ app_name }}{% endblock %}
+{% block content %}
+<section class="concert-header">
+  <div class="concert-art large"
+    {% if concert.cover_image_url %}style="background-image:url('{{ concert.cover_image_url }}')"{% endif %}></div>
+  <div>
+    <h1>{{ concert.title }}</h1>
+    <p class="muted">
+      {{ concert.venue or concert.artist or "Concert" }}{% if concert.performed_on %} · {{ concert.performed_on.strftime("%B %d, %Y") }}{% endif %}
+    </p>
+    <p class="muted small">{{ clips|length }} clip{{ "s" if clips|length != 1 else "" }}</p>
+  </div>
+</section>
+
+<section>
+  <div class="clip-row-list">
+    {% for clip in clips %}
+    <a class="clip-row" href="/clips/{{ clip.id }}">
+      <span class="clip-index">{{ loop.index }}</span>
+      <span class="clip-thumb"
+        {% if clip.thumbnail_key %}style="background-image:url('{{ media_url(clip.thumbnail_key) }}')"{% endif %}></span>
+      <span class="clip-row-main">
+        <span class="clip-row-title">{{ clip.display_title }}</span>
+        <span class="muted small">{{ clip.display_artist or "Unknown artist" }}</span>
+      </span>
+      {% if clip.duration_seconds %}
+      <span class="muted small">{{ "%d:%02d"|format((clip.duration_seconds // 60)|int, (clip.duration_seconds % 60)|int) }}</span>
+      {% endif %}
+    </a>
+    {% endfor %}
+  </div>
+</section>
+{% endblock %}

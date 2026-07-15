@@ -1,97 +1,97 @@
 # Decisions (lightweight ADRs)
 
-Records of choices already made, with rationale and things to re-verify.
-⚠️ **Pricing/limits below are directional and change often — confirm current
-terms on each provider's site before you commit or launch.**
+Choices made and why, with things to re-verify. ⚠️ **Provider pricing/limits
+change often — confirm current terms before you commit or launch.**
 
 ---
 
-## ADR-001 — Split storage: Supabase (metadata) + Cloudflare R2 (video)
+## ADR-001 — Python, FastAPI, server-rendered UI
 
-**Decision:** Postgres/metadata/auth in Supabase; raw video and derived media in
-Cloudflare R2 (S3-compatible).
+**Decision:** Python everywhere. **FastAPI** for the API + a **server-rendered
+Jinja2** web UI (vanilla JS, no build step), mobile-first responsive.
 
-**Why:** Supabase's free storage (~1 GB) is a non-starter for video. R2's draw is
-**no egress fees** (big deal for video playback) and an S3-compatible API. Clients
-upload directly via pre-signed URLs so large files never transit our API.
-
-**Verify:** R2 free-tier storage GB + Class A/B operation caps; Supabase free DB
-size/row limits. **Alternatives:** AWS S3 (egress $$), Backblaze B2, Supabase
-Storage (rejected: cap + egress).
+**Why:** You prefer Python above all. A native mobile app can't be Python;
+a responsive web app you open in your phone browser is the pragmatic MVP surface
+and keeps the whole stack in one language with no npm/build toolchain. FastAPI
+gives typed request/response models and an easy JSON API for a future native
+client. **Revisit:** a real native app is a Phase-2 option (see NOTES.md).
 
 ---
 
-## ADR-002 — Fingerprinting, not AI/LLM, for song ID
+## ADR-002 — SQLite now, Postgres-ready
 
-**Decision:** Audio-fingerprinting service. Default adapter: **AudD**. Interface
-supports **ACRCloud** and **AcoustID** behind one `FingerprintClient`.
+**Decision:** SQLAlchemy 2.0 ORM on SQLite for the MVP; switch to Postgres by
+changing `NHAC_DATABASE_URL`.
 
-**Why:** Fingerprinting is the right tool (fast, cheap, deterministic) and
-matches the "~90% is fine" bar. LLM audio models are overkill, pricier, and
-explicitly out of scope.
-
-**Trade-offs to verify (confirm current terms):**
-
-| Provider     | Model                | Notes                                                             |
-| ------------ | -------------------- | ----------------------------------------------------------------- |
-| **AudD**     | paid, small trial    | Simplest REST; returns Apple/Spotify metadata + artwork. MVP pick.|
-| **ACRCloud** | free dev tier + paid | Generous recognition catalog; HMAC-signed requests.               |
-| **AcoustID** | free / donation      | Open, MusicBrainz-backed; needs Chromaprint (`fpcalc`) client-side; metadata sparser. |
-
-**Cost control:** send a ~15s sample, not the full track; cache repeat matches;
-rate-limit. Switching provider = add an adapter + change `FINGERPRINT_PROVIDER`.
+**Why:** zero-setup, no account, runs on your laptop. The ORM keeps the code
+DB-agnostic. Dev creates tables with `create_all`; add Alembic before you rely
+on migrations in production.
 
 ---
 
-## ADR-003 — Expo / React Native for mobile
+## ADR-003 — Local storage now, R2/S3-ready
 
-**Decision:** Expo (managed) + Expo Router. **Why:** concert footage lives on
-phones; team knows the stack; OTA updates and easy device testing. Web app is a
-lightweight companion, not the primary surface.
+**Decision:** `Storage` protocol with a local-filesystem default and a
+`boto3`-based S3/R2 adapter behind the `s3` extra.
 
----
-
-## ADR-004 — Node + Express API owns the pipeline
-
-**Decision:** A small stateful Express service (not pure serverless) runs upload
-orchestration + ffmpeg + fingerprinting.
-
-**Why:** ffmpeg needs a real runtime; a long-lived process is simpler than an
-ffmpeg Lambda layer for MVP. Revisit with a queue+worker at scale (see
-ARCHITECTURE "Scaling the pipeline"). **Hosting candidates to price:** Railway,
-Render, Fly.io, a small VPS — verify free/hobby tiers + whether ffmpeg is
-available or must be bundled.
+**Why:** video on the Supabase free tier is a non-starter (~1 GB). Local disk
+needs no account for the MVP; Cloudflare **R2** (no egress fees, S3-compatible)
+is the intended cloud target — flip `NHAC_STORAGE_BACKEND=s3` and fill the
+`NHAC_S3_*` vars. **Verify:** R2 free-tier storage + operation limits.
 
 ---
 
-## ADR-005 — No Spotify integration
+## ADR-004 — Fingerprinting, not AI; mock default
 
-**Decision:** Standalone player; no Spotify upload/library sync. **Why:** Spotify's
-API does not support uploading user audio/video, and it adds copyright exposure
-for zero MVP benefit. We may read public metadata/artwork later, nothing more.
+**Decision:** Pluggable `Fingerprinter`. Default **`mock`** (offline,
+deterministic). Real adapters: **AudD** (simple REST, artwork) and **AcoustID**
+(free/open, MusicBrainz, needs `fpcalc`).
+
+**Why:** fingerprinting is the right, cheap, deterministic tool for the
+"~90% is fine" bar; LLM audio models are out of scope. The mock lets the entire
+app work end-to-end **with no API key or signup**, so the MVP is demoable today.
+Switching is one env var + a key.
+
+| Provider     | Model                | Notes                                             |
+| ------------ | -------------------- | ------------------------------------------------- |
+| **mock**     | free, offline        | Deterministic demo matches; default. Not real ID. |
+| **AudD**     | paid, small trial    | Easiest real option; returns artwork/metadata.    |
+| **AcoustID** | free / donation      | Open; sparser metadata; needs `fpcalc` binary.    |
+
+**Cost control (when real):** send a ~15s sample, cache repeat matches,
+rate-limit.
 
 ---
 
-## ADR-006 — Inline processing now, queue later
+## ADR-005 — Single-user auth for the MVP
 
-**Decision:** `uploads/complete` runs `processClip` inline for MVP.
-**Why:** simplest thing that works at low volume. **Migration trigger:** when
-uploads back up or ffmpeg contends for CPU → return `202`, enqueue, process in a
-worker, push status via Realtime.
+**Decision:** one seeded local user, injected via `get_current_user`.
+
+**Why:** avoids building/gambling on an auth system before the core loop is
+proven. It's isolated behind one dependency, so real auth (session or JWT) drops
+in without touching routers. **Your call** whether/when to go multi-user
+(NOTES.md).
 
 ---
 
-## ADR-007 — TypeScript everywhere + shared package
+## ADR-006 — No Spotify integration
 
-**Decision:** One `@nhac/shared` package for types/enums/constants/DTOs, consumed
-by API, web, and mobile. **Why:** the API contract can't silently drift across
-clients; enums map 1:1 to DB CHECK/enum types.
+**Decision:** standalone player; no Spotify upload/library sync. Spotify's API
+can't ingest user audio/video and it adds copyright exposure for zero MVP
+benefit. Public metadata/artwork lookups only, if ever.
+
+---
+
+## ADR-007 — Inline processing now, queue later
+
+**Decision:** the pipeline runs inline (in a threadpool) on upload. Simple and
+fine at low volume; migrate to a queue + worker when uploads back up
+(see ARCHITECTURE "Concurrency").
 
 ---
 
 ## Open questions
 
-- Final fingerprint provider after a real-world accuracy bake-off on live concert
-  audio (crowd noise hurts recognition — test before committing).
-- API host + whether ffmpeg ships in that environment.
-- Do we transcode/thumbnail on upload, or lazily on first playback?
+Collected for you in **[NOTES.md](NOTES.md)** — provider choice, storage/DB
+target, auth model, native app — all things I deliberately did **not** sign you
+up for or spend money on.

@@ -1,7 +1,14 @@
-# ---- Dependencies ----
-node_modules/
-.pnp/
-.pnp.js
+# ---- Python ----
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+env/
+.python-version.local
 
 # ---- Env / secrets ----
 .env
@@ -10,57 +17,36 @@ node_modules/
 *.pem
 *.key
 
-# ---- Build output ----
-dist/
-build/
-out/
-.next/
-.turbo/
-*.tsbuildinfo
-
-# ---- Expo / React Native ----
-.expo/
-.expo-shared/
-web-build/
-*.jks
-*.p8
-*.p12
-*.mobileprovision
-*.orig.*
-apps/mobile/ios/
-apps/mobile/android/
-
-# ---- Native / tooling caches ----
-.gradle/
-.cxx/
-DerivedData/
-
-# ---- Supabase local ----
-infra/supabase/.branches/
-infra/supabase/.temp/
-infra/supabase/.env
-
-# ---- Media scratch (never commit user footage / temp transcodes) ----
-tmp/
+# ---- App data (local storage + SQLite DB — never commit user media) ----
+var/
+data/
+media/
 uploads/
-media-scratch/
+*.sqlite
+*.sqlite3
+*.db
+
+# ---- Media scratch ----
+tmp/
 *.mp4
 *.mov
 *.m4a
 *.wav
 *.webm
-!docs/**/*.mp4
+!nhac/static/**/*.mp4
+!tests/fixtures/**
+
+# ---- Tooling caches ----
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+htmlcov/
+.coverage
+coverage.xml
 
 # ---- Logs ----
 logs/
 *.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-
-# ---- Coverage / test ----
-coverage/
-.nyc_output/
 
 # ---- OS / editor ----
 .DS_Store
@@ -69,4 +55,3 @@ Thumbs.db
 .vscode/*
 !.vscode/extensions.json
 !.vscode/settings.recommended.json
-*.swp

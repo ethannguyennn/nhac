@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}Upload · {{ app_name }}{% endblock %}
+{% block content %}
+<section class="narrow">
+  <h1>Add a concert clip</h1>
+  <p class="muted">
+    Pick a video from your phone or computer. Nhạc pulls the audio, finds the song,
+    and files it under the right show.
+  </p>
+
+  {% if error %}<div class="flash flash-error">{{ error }}</div>{% endif %}
+
+  <form id="upload-form" action="/upload" method="post" enctype="multipart/form-data">
+    <label class="dropzone" for="file-input">
+      <input id="file-input" name="file" type="file" accept="video/*" required hidden />
+      <span id="dz-label">Tap to choose a video</span>
+      <span class="muted small">mp4 · mov · webm — up to 500&nbsp;MB</span>
+    </label>
+    <button id="submit-btn" class="btn btn-accent btn-block" type="submit" disabled>
+      Upload &amp; identify
+    </button>
+    <div id="progress" class="progress hidden">
+      <div class="spinner"></div>
+      <span id="progress-text">Uploading &amp; identifying the song…</span>
+    </div>
+  </form>
+</section>
+{% endblock %}
+{% block scripts %}
+<script src="/static/js/app.js"></script>
+<script>Nhac.initUpload();</script>
+{% endblock %}

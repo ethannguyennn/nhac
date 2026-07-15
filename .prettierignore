@@ -1,8 +1,0 @@
-node_modules
-dist
-build
-.expo
-web-build
-coverage
-*.log
-infra/supabase/.temp

@@ -1,93 +1,103 @@
 # Setup
 
-Get Nhạc running locally end-to-end.
-
 ## Prerequisites
 
-| Tool                 | Notes                                            |
-| -------------------- | ------------------------------------------------ |
-| Node ≥ 20            | `node -v`                                        |
-| npm ≥ 10             | ships with Node                                  |
-| ffmpeg               | on PATH, or set `FFMPEG_PATH`; `ffmpeg -version` |
-| Supabase project     | free tier — https://supabase.com                 |
-| Cloudflare R2 bucket | S3-compatible — https://developers.cloudflare.com/r2 |
-| Fingerprint API key  | AudD / ACRCloud / AcoustID (see DECISIONS)       |
-| Expo Go (optional)   | to run the mobile app on a physical device       |
+| Tool         | Notes                                              |
+| ------------ | -------------------------------------------------- |
+| Python ≥ 3.11| `python --version`                                 |
+| ffmpeg + ffprobe | on PATH (`ffmpeg -version`), or set `NHAC_FFMPEG_PATH` / `NHAC_FFPROBE_PATH` |
 
-## 1. Install
+That's it for the local MVP — no database server, no cloud account, no API key.
+
+## Install & run
 
 ```bash
-npm install          # installs every workspace
-npm run shared:build # compile @nhac/shared (other packages import its dist)
+python -m venv .venv
+# Windows:  .venv\Scripts\activate
+# macOS/Linux:  source .venv/bin/activate
+pip install -r requirements-dev.txt   # or: pip install -r requirements.txt (no test/lint tools)
+
+python scripts/seed_demo.py           # optional: seed demo concerts (generates real clips)
+python run.py                         # http://127.0.0.1:8000  (auto-reload)
 ```
 
-## 2. Environment files
-
-Copy each template and fill in real values (never commit the `.env` copies):
+Prefer uvicorn directly:
 
 ```bash
-cp .env.example .env                       # catalog of everything
-cp services/api/.env.example services/api/.env
-cp apps/web/.env.example apps/web/.env
-cp apps/mobile/.env.example apps/mobile/.env
+uvicorn nhac.main:app --reload --port 8000
 ```
 
-Keys quick-reference:
+Data lives under `./var` (SQLite DB + uploaded/derived media) and is gitignored.
+Delete `./var` to reset everything.
 
-- **API** (`services/api/.env`): `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`,
-  all `R2_*`, `FINGERPRINT_PROVIDER` + provider key. **Server-only secrets.**
-- **Web** (`apps/web/.env`): `VITE_API_BASE_URL`, `VITE_SUPABASE_URL`,
-  `VITE_SUPABASE_ANON_KEY`.
-- **Mobile** (`apps/mobile/.env`): `EXPO_PUBLIC_API_BASE_URL` (use your machine's
-  **LAN IP** for a physical device, not `localhost`), `EXPO_PUBLIC_SUPABASE_URL`,
-  `EXPO_PUBLIC_SUPABASE_ANON_KEY`.
+## Configuration
 
-## 3. Supabase
-
-1. Create a project; grab the URL, anon key, and service-role key.
-2. Apply the schema — see [`infra/supabase/README.md`](../infra/supabase/README.md):
-   ```bash
-   supabase link --project-ref <ref>
-   supabase db push
-   ```
-   (or paste `0001_init.sql` then `0002_rls.sql` into the SQL editor).
-3. Enable Email auth. Optionally run `seed.sql` for demo mode.
-
-## 4. Cloudflare R2
-
-1. Create a bucket (e.g. `nhac-media`).
-2. Create an R2 API token (access key + secret); note the account ID + S3
-   endpoint. Fill the `R2_*` vars.
-3. **CORS:** allow `PUT`/`GET` from your web + Expo origins so direct uploads
-   work from the browser/device.
-
-## 5. Run
+Copy the template and edit as needed (the app runs fine with none of it):
 
 ```bash
-npm run api:dev      # http://localhost:4000  (GET /health to check)
-npm run web:dev      # http://localhost:5173
-npm run mobile:start # Expo dev server → scan QR with Expo Go
+cp .env.example .env
 ```
 
-## 6. Verify
+All settings are `NHAC_`-prefixed (see `nhac/config.py`). Highlights:
+
+| Setting                      | Default          | Purpose                              |
+| ---------------------------- | ---------------- | ------------------------------------ |
+| `NHAC_DATABASE_URL`          | SQLite in ./var  | Swap for Postgres later              |
+| `NHAC_STORAGE_BACKEND`       | `local`          | `local` or `s3`                      |
+| `NHAC_FINGERPRINT_PROVIDER`  | `mock`           | `mock`, `audd`, or `acoustid`        |
+| `NHAC_DEFAULT_USER_EMAIL`    | you@example.com  | The seeded single MVP user           |
+
+### Use a real fingerprinter
+
+**AudD:**
 
 ```bash
-curl http://localhost:4000/health
-# → { "ok": true, "service": "nhac-api", ... }
+# .env
+NHAC_FINGERPRINT_PROVIDER=audd
+NHAC_AUDD_API_TOKEN=your-token
 ```
 
-Then upload a short concert clip from the web or mobile app and watch the API
-logs move through extract → fingerprint → organize.
+**AcoustID** (needs the `fpcalc`/Chromaprint binary on PATH):
+
+```bash
+pip install -e ".[acoustid]"
+# .env
+NHAC_FINGERPRINT_PROVIDER=acoustid
+NHAC_ACOUSTID_API_KEY=your-key
+```
+
+### Use Cloudflare R2 / S3 storage
+
+```bash
+pip install -e ".[s3]"
+# .env
+NHAC_STORAGE_BACKEND=s3
+NHAC_S3_BUCKET=nhac-media
+NHAC_S3_ENDPOINT_URL=https://<account>.r2.cloudflarestorage.com
+NHAC_S3_ACCESS_KEY_ID=...
+NHAC_S3_SECRET_ACCESS_KEY=...
+NHAC_S3_PUBLIC_BASE_URL=https://media.yourdomain.com   # or leave blank for presigned URLs
+```
+
+## Testing your phone
+
+Run the server, find your machine's LAN IP, and open
+`http://<LAN-IP>:8000` on your phone (same Wi-Fi). Uploading from the phone's
+camera roll is the intended flow. Bind all interfaces if needed:
+`uvicorn nhac.main:app --host 0.0.0.0 --port 8000`.
+
+## Dev commands
+
+```bash
+pytest                 # tests
+ruff check .           # lint
+ruff check . --fix     # autofix
+```
 
 ## Troubleshooting
 
-- **API won't boot / env error:** `src/config/env.ts` validation printed the
-  missing/invalid vars — fix `.env`.
-- **`@nhac/shared` not found:** run `npm run shared:build` (and re-run after
-  editing shared types).
-- **Upload 403 to R2:** check the presigned URL hasn't expired and bucket CORS
-  allows your origin + `PUT`.
-- **ffmpeg errors:** confirm `ffmpeg -version`, or set `FFMPEG_PATH` to the
-  binary.
-- **Device can't reach API:** use your LAN IP in `EXPO_PUBLIC_API_BASE_URL`, and
-  make sure phone + computer share a network.
+- **`ffmpeg not found`** → install it / set `NHAC_FFMPEG_PATH` and `NHAC_FFPROBE_PATH`.
+- **App won't start with a config error** → `config.py` validation lists the bad var.
+- **Everything got identified as random songs** → that's the `mock` provider
+  (deterministic fake matches). Set a real provider to identify actual songs.
+- **Reset all data** → stop the server, delete `./var`.

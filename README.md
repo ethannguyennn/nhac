@@ -3,79 +3,104 @@
 > _Relive the moment._
 
 Nhạc (Vietnamese for "music") turns the scattered concert videos on your phone
-into a clean, replayable "greatest hits" experience. Upload your clips — Nhạc
-extracts the audio, **identifies the song** via audio fingerprinting
-(Shazam-style, not AI), and **auto-organizes** everything into playlists by
-concert and song. Later: relive shows collaboratively with friends who were
-there too.
+into a clean, replayable "greatest hits" experience. Upload a clip — Nhạc pulls
+the audio, **identifies the song** by audio fingerprinting (Shazam-style, not
+AI), and **auto-organizes** it into a playlist by concert and song. Then you
+relive it with a video player and a warm audio-reactive visualizer.
 
-This repo is an early-stage MVP scaffold. It's structured like a real product
-but built to stay **cheap and simple** — free tiers first, ~90% detection
-accuracy with a manual-tag fallback, ship-fun-first.
+**This is a working MVP**, written in **Python** and runnable on your laptop
+with **zero external accounts** — SQLite, local file storage, and an offline
+"mock" song-recognizer by default. Real cloud storage and fingerprinting
+providers are wired and one config flag away.
 
 ---
 
-## Monorepo layout
+## What works today
 
-```
-nhac/
-├── apps/
-│   ├── mobile/        # Expo / React Native — the primary experience
-│   └── web/           # Vite + React — upload/playback companion
-├── services/
-│   └── api/           # Node + Express — upload orchestration, ffmpeg, fingerprinting
-├── packages/
-│   └── shared/        # Shared TS domain types, enums, constants, DTOs
-├── infra/
-│   └── supabase/      # Postgres schema, RLS, seed (metadata DB + auth)
-└── docs/              # Architecture, workflows, roadmap, decisions, setup, legal
-```
+- 📤 **Upload** a concert video (web, mobile-first — open it on your phone browser)
+- 🎧 **Audio extraction** from the video via ffmpeg
+- 🔎 **Song identification** through a pluggable fingerprinter (offline mock by
+  default; AudD / AcoustID adapters included)
+- ✍️ **Manual tagging** fallback when detection misses
+- 🗂️ **Auto-organization** into concerts + playlists by artist/date
+- ▶️ **Playback** with an audio-reactive visualizer
+- 🌱 **Demo mode** — seeded sample concerts (with real generated clips) so a
+  fresh install feels alive
+- ✅ **Tested** — pytest covers the pipeline end-to-end
 
-**Storage split:** Supabase (Postgres) holds metadata; **Cloudflare R2** holds
-video files. Video never sits in Supabase (1 GB free cap). See
-[docs/DECISIONS.md](docs/DECISIONS.md).
+## Tech stack
 
-## The core flow
-
-```
-record  →  upload  →  extract audio (ffmpeg)  →  fingerprint (AudD/ACRCloud/AcoustID)
-        →  identify song (or manual tag)  →  auto-group into concert + playlist  →  play
-```
-
-Full diagrams in [docs/WORKFLOWS.md](docs/WORKFLOWS.md).
+| Layer          | Choice                                             |
+| -------------- | -------------------------------------------------- |
+| Web framework  | **FastAPI** (+ Uvicorn)                            |
+| UI             | Server-rendered **Jinja2** templates, vanilla JS   |
+| Database       | **SQLAlchemy 2.0** ORM · SQLite (→ Postgres later) |
+| Storage        | Local filesystem (→ Cloudflare R2 / S3 adapter)    |
+| Audio          | **ffmpeg / ffprobe**                               |
+| Fingerprinting | Pluggable: `mock` (default) · AudD · AcoustID      |
+| Config         | pydantic-settings                                  |
+| Tests / lint   | pytest · ruff                                      |
 
 ## Quick start
 
-Prereqs: Node ≥ 20, npm, `ffmpeg` on PATH, a Supabase project, a Cloudflare R2
-bucket, and a fingerprint API key. Full walkthrough in
-[docs/SETUP.md](docs/SETUP.md).
+Prereqs: **Python ≥ 3.11** and **ffmpeg** on your PATH.
 
 ```bash
-npm install                       # install all workspaces
-cp .env.example .env              # + per-app .env files (see SETUP)
-npm run shared:build              # build shared types once
+python -m venv .venv
+# Windows:  .venv\Scripts\activate      macOS/Linux:  source .venv/bin/activate
+pip install -r requirements-dev.txt
 
-npm run api:dev                   # API on :4000
-npm run web:dev                   # web on :5173
-npm run mobile:start              # Expo dev server
+python scripts/seed_demo.py            # optional: demo concerts
+python run.py                          # → http://127.0.0.1:8000
+```
+
+Open <http://127.0.0.1:8000>, hit **＋ Upload**, pick a video, watch it get
+identified and filed under a concert. Full guide: [docs/SETUP.md](docs/SETUP.md).
+
+```bash
+pytest        # run the tests
+ruff check .  # lint
+```
+
+## Project layout
+
+```
+nhac/
+├── nhac/
+│   ├── main.py            # FastAPI app factory
+│   ├── config.py          # pydantic-settings
+│   ├── db.py  models.py   # SQLAlchemy engine + ORM
+│   ├── schemas.py         # Pydantic API contracts
+│   ├── storage/           # local + s3/r2 backends
+│   ├── audio/ffmpeg.py    # extract / probe / quality
+│   ├── fingerprint/       # base · mock · audd · acoustid
+│   ├── pipeline/          # process_clip · organize
+│   ├── services/          # clips · songs · concerts · playlists · users
+│   ├── routers/           # api.py (JSON) · web.py (HTML)
+│   ├── templates/  static/# Jinja2 UI + CSS/JS
+│   └── uploads.py         # upload orchestration
+├── scripts/seed_demo.py   # demo-mode content
+├── tests/                 # pytest
+└── docs/                  # architecture, roadmap, workflows, decisions, setup, legal, notes
 ```
 
 ## Where to look next
 
-| I want to…                        | Read                                         |
-| --------------------------------- | -------------------------------------------- |
+| I want to…                       | Read                                         |
+| -------------------------------- | -------------------------------------------- |
 | Understand the system            | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) |
 | See the build plan / open todos  | [docs/ROADMAP.md](docs/ROADMAP.md)           |
 | Trace a pipeline end-to-end      | [docs/WORKFLOWS.md](docs/WORKFLOWS.md)       |
 | Know why we picked X over Y      | [docs/DECISIONS.md](docs/DECISIONS.md)       |
-| Set up my own environment        | [docs/SETUP.md](docs/SETUP.md)               |
-| Understand the copyright stance  | [docs/LEGAL.md](docs/LEGAL.md)               |
+| Set up / configure providers     | [docs/SETUP.md](docs/SETUP.md)               |
+| Decisions I left for you         | [docs/NOTES.md](docs/NOTES.md)               |
+| Copyright stance                 | [docs/LEGAL.md](docs/LEGAL.md)               |
 
 ## Status
 
-🚧 **Scaffold.** Structure, types, schema, and the pipeline skeleton are in
-place; handlers marked `TODO` are the next implementation steps (tracked in
-[docs/ROADMAP.md](docs/ROADMAP.md)). Not production-ready.
+🟢 **Working MVP** (local, single-user). Phase-2 features (collaboration,
+cleanest-audio selection, multi-angle edits, social export) are designed but not
+built — see the roadmap. Not yet production-hardened.
 
 ## License
 
