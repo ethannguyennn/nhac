@@ -18,6 +18,7 @@ import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 
+from nhac.analysis.excitement import analyze_and_store
 from nhac.audio import ffmpeg
 from nhac.constants import (
     MIN_MATCH_CONFIDENCE,
@@ -102,6 +103,14 @@ def process_clip(clip_id: str) -> ProcessResult:
             clip.audio_quality_score = ffmpeg.estimate_audio_quality(audio_tmp)
         except Exception as exc:  # noqa: BLE001 - non-fatal
             log.debug("quality estimate failed: %s", exc)
+
+        # 4.5 Excitement analysis → highlights (powers the hype-cut montage
+        # and "jump to the good part"). Non-fatal: a clip without highlights
+        # still identifies and plays normally.
+        try:
+            analyze_and_store(session, clip, raw_path)
+        except Exception as exc:  # noqa: BLE001 - non-fatal
+            log.warning("excitement analysis failed for %s: %s", clip_id, exc)
 
         # 5. Fingerprint.
         fingerprinter = get_fingerprinter()

@@ -70,21 +70,59 @@ h2 { font-size: 1.1rem; }
   background: var(--surface-alt); border: 1px solid var(--border);
   border-left: 3px solid var(--accent); border-radius: var(--radius-sm);
   font-size: .9rem;
+  animation: flashIn .35s ease both, flashOut .5s ease 5s both;
 }
-.flash-error { border-left-color: var(--accent-alt); }
+.flash-error { border-left-color: var(--accent-alt); animation: flashIn .35s ease both; }
+@keyframes flashIn { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: none; } }
+@keyframes flashOut { to { opacity: 0; transform: translateY(-6px); visibility: hidden; } }
+
+/* Page entrance */
+main.container { animation: pageIn .4s ease both; }
+@keyframes pageIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 
 /* Cards / concerts */
 .card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 1rem; }
-.concert-card { display: flex; flex-direction: column; gap: .5rem; }
+.concert-card {
+  display: flex; flex-direction: column; gap: .5rem;
+  animation: riseIn .5s ease both;
+  transition: transform .18s ease;
+}
+.concert-card:hover { transform: translateY(-3px); }
 .concert-art {
   aspect-ratio: 1; border-radius: var(--radius);
   background: linear-gradient(135deg, var(--accent), var(--accent-alt));
   background-size: cover; background-position: center;
   position: relative; box-shadow: 0 8px 24px rgba(0,0,0,.35);
+  transition: box-shadow .18s ease;
 }
+.concert-card:hover .concert-art { box-shadow: 0 14px 34px rgba(0,0,0,.5); }
 .concert-art.large { width: 120px; height: 120px; flex: none; }
+.concert-meta { display: block; }
 .concert-title { font-weight: 700; }
-.concert-header { display: flex; gap: 1rem; align-items: center; margin: 1rem 0 1.5rem; }
+.concert-header { display: flex; gap: 1.25rem; align-items: center; margin: 1rem 0 1.5rem; }
+.concert-header-main { display: flex; flex-direction: column; gap: .2rem; align-items: flex-start; }
+.play-all { margin-top: .6rem; gap: .45rem; }
+.play-all svg { margin-left: -2px; }
+
+/* Play button that floats over a concert card's art */
+.play-fab {
+  position: absolute; right: .6rem; bottom: .6rem;
+  width: 44px; height: 44px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--accent); color: var(--accent-ink);
+  box-shadow: 0 6px 18px rgba(0,0,0,.45);
+  opacity: 0; transform: translateY(6px) scale(.9);
+  transition: opacity .18s ease, transform .18s ease;
+}
+.play-fab svg { width: 22px; height: 22px; fill: currentColor; margin-left: 2px; }
+.concert-card:hover .play-fab, .play-fab:focus-visible { opacity: 1; transform: none; }
+.play-fab:hover { transform: scale(1.08) !important; }
+@media (hover: none) { .play-fab { opacity: 1; transform: none; } }
+
+@keyframes riseIn {
+  from { opacity: 0; transform: translateY(14px); }
+  to { opacity: 1; transform: none; }
+}
 
 /* Chips */
 .chip {
@@ -98,10 +136,22 @@ h2 { font-size: 1.1rem; }
 /* Clip rows */
 .clip-row-list { display: flex; flex-direction: column; }
 .clip-row {
+  position: relative;
   display: flex; align-items: center; gap: .75rem;
-  padding: .6rem 0; border-bottom: 1px solid var(--border);
+  padding: .6rem .4rem; border-bottom: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  animation: riseIn .45s ease both;
+  transition: background .15s ease;
 }
-.clip-index { width: 1.2rem; text-align: center; color: var(--muted); font-size: .9rem; }
+.clip-row:hover { background: rgba(255,255,255,.045); }
+.row-link { position: absolute; inset: 0; z-index: 1; border-radius: inherit; }
+.clip-index {
+  width: 1.4rem; text-align: center; color: var(--muted); font-size: .9rem;
+  display: flex; align-items: center; justify-content: center; flex: none;
+}
+.clip-index .idx-play { display: none; width: 18px; height: 18px; fill: var(--accent); }
+.clip-row:hover .idx-num { display: none; }
+.clip-row:hover .idx-play { display: block; }
 .clip-thumb {
   width: 48px; height: 48px; border-radius: var(--radius-sm); flex: none;
   background: var(--surface-alt) center/cover no-repeat;
@@ -110,6 +160,14 @@ h2 { font-size: 1.1rem; }
 .clip-thumb.wide { width: 100%; height: 180px; border-radius: var(--radius); margin: 1rem 0; }
 .clip-row-main { display: flex; flex-direction: column; flex: 1; min-width: 0; }
 .clip-row-title { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.row-detail {
+  position: relative; z-index: 2;
+  display: flex; align-items: center; justify-content: center;
+  width: 34px; height: 34px; border-radius: 50%; color: var(--muted);
+  transition: background .15s ease, color .15s ease;
+}
+.row-detail svg { width: 18px; height: 18px; fill: currentColor; }
+.row-detail:hover { background: rgba(255,255,255,.1); color: var(--text); }
 
 /* Empty state */
 .empty { text-align: center; padding: 2.5rem 1rem; color: var(--muted); }
@@ -157,4 +215,13 @@ h2 { font-size: 1.1rem; }
 
 @media (min-width: 620px) {
   .stage { aspect-ratio: 16 / 10; max-height: none; }
+}
+
+/* Reduced motion: keep the app calm for users who ask for it */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

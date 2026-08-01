@@ -4,20 +4,31 @@
 <section class="concert-header">
   <div class="concert-art large"
     {% if concert.cover_image_url %}style="background-image:url('{{ concert.cover_image_url }}')"{% endif %}></div>
-  <div>
+  <div class="concert-header-main">
     <h1>{{ concert.title }}</h1>
     <p class="muted">
       {{ concert.venue or concert.artist or "Concert" }}{% if concert.performed_on %} · {{ concert.performed_on.strftime("%B %d, %Y") }}{% endif %}
     </p>
     <p class="muted small">{{ clips|length }} clip{{ "s" if clips|length != 1 else "" }}</p>
+    {% if clips %}
+    <a class="btn btn-accent play-all" href="/concerts/{{ concert.id }}/play">
+      <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+      Play all · shuffle
+    </a>
+    {% endif %}
   </div>
 </section>
 
 <section>
   <div class="clip-row-list">
     {% for clip in clips %}
-    <a class="clip-row" href="/clips/{{ clip.id }}">
-      <span class="clip-index">{{ loop.index }}</span>
+    <div class="clip-row" style="animation-delay: {{ loop.index0 * 45 }}ms">
+      <a class="row-link" href="/play/{{ playlist_id }}?track={{ clip.id }}"
+         aria-label="Play {{ clip.display_title }}"></a>
+      <span class="clip-index">
+        <span class="idx-num">{{ loop.index }}</span>
+        <svg class="idx-play" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+      </span>
       <span class="clip-thumb"
         {% if clip.thumbnail_key %}style="background-image:url('{{ media_url(clip.thumbnail_key) }}')"{% endif %}></span>
       <span class="clip-row-main">
@@ -27,7 +38,10 @@
       {% if clip.duration_seconds %}
       <span class="muted small">{{ "%d:%02d"|format((clip.duration_seconds // 60)|int, (clip.duration_seconds % 60)|int) }}</span>
       {% endif %}
-    </a>
+      <a class="row-detail" href="/clips/{{ clip.id }}" title="Clip details" aria-label="Clip details">
+        <svg viewBox="0 0 24 24"><path d="M12 8a2 2 0 1 0 0-4 2 2 0 0 0 0 4zm0 2a2 2 0 1 0 0 4 2 2 0 0 0 0-4zm0 6a2 2 0 1 0 0 4 2 2 0 0 0 0-4z"/></svg>
+      </a>
+    </div>
     {% endfor %}
   </div>
 </section>

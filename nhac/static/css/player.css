@@ -1,0 +1,421 @@
+/* ═══════════════════════════════════════════════════════════════
+   Nhạc theater mode — chromeless player.
+   Only the video is on screen; moving the mouse (or tapping) fades
+   the controls in, idling fades them (and the cursor) away.
+   ═══════════════════════════════════════════════════════════════ */
+
+:root {
+  --accent: #e0a458;
+  --accent-ink: #1a1206;
+  --text: #f5f3ef;
+  --dim: rgba(245, 243, 239, 0.55);
+  --ui-fade: 320ms;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body.theater {
+  height: 100%;
+  background: #000;
+  color: var(--text);
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ---- Stage ------------------------------------------------------------- */
+
+#pv {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  z-index: 2;
+}
+
+.backdrop {
+  position: fixed;
+  inset: -6%;
+  background: #000 center / cover no-repeat;
+  filter: blur(48px) brightness(0.32) saturate(1.25);
+  transform: scale(1.08);
+  opacity: 0;
+  transition: opacity 900ms ease;
+  z-index: 0;
+}
+.backdrop.active { opacity: 1; }
+
+.vignette {
+  position: fixed;
+  inset: 0;
+  background: radial-gradient(ellipse at center, transparent 55%, rgba(0, 0, 0, 0.55) 100%);
+  z-index: 1;
+  pointer-events: none;
+}
+
+/* ---- Buffering indicator -------------------------------------------------- */
+
+.buffering {
+  position: fixed;
+  inset: 0;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 200ms ease 220ms; /* small delay: don't flash on instant seeks */
+}
+body.buffering .buffering { opacity: 1; }
+.spinner-ring {
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  border: 3px solid rgba(255, 255, 255, 0.22);
+  border-top-color: var(--accent);
+  animation: spinRing 800ms linear infinite;
+}
+@keyframes spinRing { to { transform: rotate(360deg); } }
+
+/* ---- Auto-hiding chrome ------------------------------------------------- */
+
+.ui {
+  position: fixed;
+  inset: 0;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  opacity: 1;
+  transition: opacity var(--ui-fade) ease;
+  pointer-events: none; /* children re-enable */
+}
+.ui > * { pointer-events: auto; }
+
+body.idle { cursor: none; }
+body.idle .ui { opacity: 0; }
+body.idle .ui > * { pointer-events: none; }
+
+.ui-top {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: max(14px, env(safe-area-inset-top)) 18px 28px;
+  background: linear-gradient(to bottom, rgba(0, 0, 0, 0.72), transparent);
+  animation: slideDown 420ms ease both;
+}
+
+.ui-bottom {
+  padding: 34px 18px max(14px, env(safe-area-inset-bottom));
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.78), transparent);
+  animation: slideUp 420ms ease both;
+}
+
+@keyframes slideDown { from { transform: translateY(-14px); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes slideUp   { from { transform: translateY(14px);  opacity: 0; } to { transform: none; opacity: 1; } }
+
+/* ---- Now playing (top bar) ---------------------------------------------- */
+
+.now { display: flex; align-items: center; gap: 12px; flex: 1; min-width: 0; }
+.now-text { min-width: 0; }
+.now-title {
+  font-weight: 800;
+  font-size: 1.02rem;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.now-artist { color: var(--dim); font-size: 0.82rem; margin-top: 2px; }
+.pl-name {
+  color: var(--dim);
+  font-size: 0.8rem;
+  font-weight: 600;
+  max-width: 28ch;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Animated equalizer — dances while playing, freezes when paused */
+.eq { display: flex; align-items: flex-end; gap: 3px; width: 20px; height: 18px; flex: none; }
+.eq i {
+  flex: 1;
+  background: var(--accent);
+  border-radius: 2px;
+  height: 100%;
+  transform-origin: bottom;
+  animation: eqBounce 900ms ease-in-out infinite alternate;
+}
+.eq i:nth-child(1) { animation-delay: -120ms; }
+.eq i:nth-child(2) { animation-delay: -340ms; }
+.eq i:nth-child(3) { animation-delay: -560ms; }
+.eq i:nth-child(4) { animation-delay: -780ms; }
+.eq.paused i { animation-play-state: paused; opacity: 0.45; }
+@keyframes eqBounce { from { transform: scaleY(0.25); } to { transform: scaleY(1); } }
+
+/* ---- Buttons ------------------------------------------------------------ */
+
+.icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+  position: relative;
+  transition: transform 160ms ease, background 160ms ease, color 160ms ease;
+  -webkit-tap-highlight-color: transparent;
+}
+.icon-btn svg { width: 24px; height: 24px; fill: currentColor; }
+.icon-btn:hover { background: rgba(255, 255, 255, 0.12); transform: scale(1.08); }
+.icon-btn:active { transform: scale(0.94); }
+
+.icon-btn.primary {
+  width: 58px;
+  height: 58px;
+  background: var(--text);
+  color: #000;
+}
+.icon-btn.primary:hover { background: #fff; transform: scale(1.06); }
+.icon-btn.primary svg { width: 30px; height: 30px; }
+
+/* play/pause swap */
+.icon-btn .ic-pause { display: none; }
+body.playing .icon-btn .ic-pause { display: block; }
+body.playing .icon-btn .ic-play { display: none; }
+
+/* mute swap */
+.icon-btn .ic-muted { display: none; }
+body.muted #btn-mute .ic-muted { display: block; }
+body.muted #btn-mute .ic-vol { display: none; }
+
+/* toggle buttons (shuffle / hype): amber + dot when active */
+.icon-btn.toggleable.on { color: var(--accent); }
+.icon-btn.toggleable.on::after {
+  content: "";
+  position: absolute;
+  bottom: 5px;
+  left: 50%;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--accent);
+  transform: translateX(-50%);
+}
+
+/* hype build spinner */
+#btn-hype.building svg { animation: hypePulse 700ms ease-in-out infinite alternate; }
+@keyframes hypePulse { from { opacity: 0.35; transform: scale(0.9); } to { opacity: 1; transform: scale(1.12); } }
+
+/* ---- Transport row ------------------------------------------------------ */
+
+.controls {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  margin-top: 10px;
+  gap: 8px;
+}
+.controls-center { display: flex; align-items: center; justify-content: center; gap: 10px; }
+.controls-side { display: flex; align-items: center; gap: 6px; }
+.controls-side.left { justify-self: start; }
+.controls-side.right { justify-self: end; }
+
+.time { font-size: 0.8rem; font-variant-numeric: tabular-nums; color: var(--text); }
+.time.dim { color: var(--dim); }
+
+/* ---- Progress bar -------------------------------------------------------- */
+
+.progress {
+  position: relative;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  touch-action: none;
+}
+.progress-track,
+.progress-buffered,
+.progress-fill {
+  position: absolute;
+  left: 0;
+  height: 4px;
+  border-radius: 999px;
+  transition: height 140ms ease;
+  pointer-events: none;
+}
+.progress-track { width: 100%; background: rgba(255, 255, 255, 0.18); }
+.progress-buffered { width: 0; background: rgba(255, 255, 255, 0.28); }
+.progress-fill { width: 0; background: var(--accent); }
+
+/* Highlight tick marks: where the exciting moments are, at a glance —
+   "jump to the good part" without switching to the hype cut. */
+.progress-highlights {
+  position: absolute;
+  left: 0;
+  width: 100%;
+  height: 4px;
+  pointer-events: none;
+  transition: height 140ms ease;
+}
+.progress-highlights .mark {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  min-width: 3px;
+  border-radius: 999px;
+  background: rgba(224, 164, 88, 0.85);
+  box-shadow: 0 0 4px rgba(224, 164, 88, 0.55);
+}
+.progress .knob {
+  position: absolute;
+  right: -7px;
+  top: 50%;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--accent);
+  transform: translateY(-50%) scale(0);
+  transition: transform 140ms ease;
+  box-shadow: 0 0 0 5px rgba(224, 164, 88, 0.22);
+}
+.progress:hover .progress-track,
+.progress:hover .progress-buffered,
+.progress:hover .progress-highlights,
+.progress:hover .progress-fill,
+.progress.dragging .progress-track,
+.progress.dragging .progress-buffered,
+.progress.dragging .progress-highlights,
+.progress.dragging .progress-fill { height: 7px; }
+.progress:hover .knob,
+.progress.dragging .knob { transform: translateY(-50%) scale(1); }
+
+/* ---- Track intro (cinematic title card) ---------------------------------- */
+
+.track-intro {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 18vh;
+  z-index: 4;
+  text-align: center;
+  padding: 0 8vw;
+  pointer-events: none;
+  opacity: 0;
+}
+.track-intro.show { animation: introCard 3s ease both; }
+.ti-title {
+  font-size: clamp(1.6rem, 5.5vw, 3.4rem);
+  font-weight: 900;
+  letter-spacing: -0.03em;
+  text-shadow: 0 4px 34px rgba(0, 0, 0, 0.8);
+}
+.ti-artist {
+  margin-top: 6px;
+  font-size: clamp(0.95rem, 2.4vw, 1.3rem);
+  font-weight: 600;
+  color: var(--accent);
+  text-shadow: 0 2px 18px rgba(0, 0, 0, 0.8);
+}
+@keyframes introCard {
+  0%   { opacity: 0; transform: translateY(16px) scale(1.05); filter: blur(8px); }
+  14%  { opacity: 1; transform: none; filter: none; }
+  72%  { opacity: 1; }
+  100% { opacity: 0; transform: translateY(-8px); }
+}
+
+/* ---- Start overlay (autoplay fallback) ----------------------------------- */
+
+.start-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  background: rgba(0, 0, 0, 0.66);
+  backdrop-filter: blur(14px);
+  animation: fadeIn 360ms ease both;
+}
+.start-overlay[hidden] { display: none; }
+.start-btn {
+  width: 92px;
+  height: 92px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--accent-ink);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  transition: transform 160ms ease;
+}
+.start-btn svg { width: 44px; height: 44px; fill: currentColor; margin-left: 5px; }
+.start-btn:hover { transform: scale(1.07); }
+.start-btn::after {
+  content: "";
+  position: absolute;
+  inset: -6px;
+  border-radius: 50%;
+  border: 2px solid var(--accent);
+  animation: ripple 1.8s ease-out infinite;
+}
+@keyframes ripple {
+  0%   { transform: scale(1); opacity: 0.9; }
+  100% { transform: scale(1.55); opacity: 0; }
+}
+.start-text { color: var(--dim); font-weight: 600; letter-spacing: 0.02em; }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+/* ---- Toast ---------------------------------------------------------------- */
+
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: 12vh;
+  z-index: 8;
+  transform: translate(-50%, 16px);
+  background: rgba(22, 22, 29, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  color: var(--text);
+  font-size: 0.88rem;
+  font-weight: 600;
+  padding: 10px 18px;
+  border-radius: 999px;
+  opacity: 0;
+  transition: opacity 240ms ease, transform 240ms ease;
+  pointer-events: none;
+  max-width: 82vw;
+  text-align: center;
+}
+.toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+/* ---- Small screens --------------------------------------------------------- */
+
+@media (max-width: 560px) {
+  .pl-name { display: none; }
+  .controls-center { gap: 4px; }
+  .icon-btn { width: 42px; height: 42px; }
+  .icon-btn.primary { width: 54px; height: 54px; }
+}
+
+/* ---- Reduced motion --------------------------------------------------------- */
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

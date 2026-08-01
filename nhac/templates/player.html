@@ -26,6 +26,9 @@
     {% elif clip.match_source and clip.match_source.value == "manual" %}
     <p class="chip">manually tagged</p>
     {% endif %}
+    {% if theater_url %}
+    <a class="btn btn-accent" href="{{ theater_url }}">▶ Watch in theater</a>
+    {% endif %}
     {% if clip.concert_id %}
     <a class="btn btn-ghost btn-sm" href="/concerts/{{ clip.concert_id }}">← Back to concert</a>
     {% endif %}

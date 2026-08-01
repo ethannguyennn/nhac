@@ -11,7 +11,7 @@
   <p class="muted small">We couldn’t auto-detect these — tag them so they find their concert.</p>
   <div class="clip-row-list">
     {% for clip in unidentified %}
-    <a class="clip-row" href="/clips/{{ clip.id }}/tag">
+    <a class="clip-row" href="/clips/{{ clip.id }}/tag" style="animation-delay: {{ loop.index0 * 50 }}ms">
       <span class="clip-thumb small"
         {% if clip.thumbnail_key %}style="background-image:url('{{ media_url(clip.thumbnail_key) }}')"{% endif %}></span>
       <span class="clip-row-main">
@@ -30,18 +30,22 @@
   {% if concerts %}
   <div class="card-grid">
     {% for concert in concerts %}
-    <a class="concert-card" href="/concerts/{{ concert.id }}">
+    <div class="concert-card" style="animation-delay: {{ loop.index0 * 60 }}ms">
       <div class="concert-art"
         {% if concert.cover_image_url %}style="background-image:url('{{ concert.cover_image_url }}')"{% endif %}>
         {% if concert.is_demo %}<span class="chip chip-demo">demo</span>{% endif %}
+        <a class="play-fab" href="/concerts/{{ concert.id }}/play"
+           aria-label="Play {{ concert.title }} (shuffle)">
+          <svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+        </a>
       </div>
-      <div class="concert-meta">
+      <a class="concert-meta" href="/concerts/{{ concert.id }}">
         <div class="concert-title">{{ concert.title }}</div>
         <div class="muted small">
           {{ concert.venue or concert.artist or "Concert" }}{% if concert.performed_on %} · {{ concert.performed_on.strftime("%b %Y") }}{% endif %}
         </div>
-      </div>
-    </a>
+      </a>
+    </div>
     {% endfor %}
   </div>
   {% else %}

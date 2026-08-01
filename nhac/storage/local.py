@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
+import os
 import shutil
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 from nhac.config import settings
 
@@ -16,11 +17,22 @@ class LocalStorage:
 
     def _path(self, key: str) -> Path:
         # Prevent path traversal; keys are app-generated but be defensive.
-        safe = Path(key.replace("\\", "/"))
-        if safe.is_absolute() or ".." in safe.parts:
+        #
+        # Deliberately PURE-LEXICAL (normpath + string prefix check) — no
+        # Path.resolve() on the target. resolve() touches the filesystem, and
+        # under concurrent requests it can race with a sibling thread's
+        # mkdir() for a not-yet-existing parent directory: observed on
+        # Windows as an intermittent false-positive "Unsafe storage key" for
+        # a perfectly safe key when two montage builds for different clips
+        # landed at once. self.root is resolved once at construction, which
+        # is fine — it's the per-call target resolution that was racy.
+        safe = PurePosixPath(key.replace("\\", "/"))
+        if not key or safe.is_absolute() or ".." in safe.parts:
             raise ValueError(f"Unsafe storage key: {key!r}")
-        target = (self.root / safe).resolve()
-        if not str(target).startswith(str(self.root)):
+        target = self.root.joinpath(*safe.parts)
+        root_str = os.path.normpath(str(self.root))
+        target_str = os.path.normpath(str(target))
+        if target_str != root_str and not target_str.startswith(root_str + os.sep):
             raise ValueError(f"Unsafe storage key: {key!r}")
         return target
 

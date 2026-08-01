@@ -78,3 +78,47 @@ class UploadResultOut(BaseModel):
     clip: ClipOut
     identified: bool
     message: str
+
+
+# ---- Playback / theater mode ----
+
+
+class HighlightOut(ORMModel):
+    """An exciting-moment segment within a clip (seconds from clip start)."""
+
+    start_seconds: float
+    end_seconds: float
+    score: float
+
+
+class QueueItemOut(BaseModel):
+    """One playable track in the theater queue."""
+
+    clip_id: str
+    title: str
+    artist: str | None = None
+    media_url: str
+    montage_url: str | None = None  # hype-cut, if rendered
+    thumbnail_url: str | None = None
+    duration_seconds: float | None = None
+    highlights: list[HighlightOut] = Field(default_factory=list)
+
+
+class QueueOut(BaseModel):
+    playlist_id: str
+    title: str
+    items: list[QueueItemOut] = Field(default_factory=list)
+
+
+class PlaylistSummaryOut(ORMModel):
+    id: str
+    type: PlaylistType
+    title: str
+    concert_id: str | None = None
+    clip_count: int = 0
+
+
+class MontageOut(BaseModel):
+    clip_id: str
+    montage_url: str
+    built: bool

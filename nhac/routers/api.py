@@ -3,20 +3,26 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi.concurrency import run_in_threadpool
 from sqlalchemy.orm import Session
 
 from nhac.deps import get_current_user, get_session
 from nhac.models import User
+from nhac.pipeline.montage import MontageError, build_montage
 from nhac.schemas import (
     ClipDetailOut,
     ClipOut,
     ConcertOut,
     ConcertWithClipsOut,
+    MontageOut,
+    PlaylistSummaryOut,
+    QueueOut,
     TagClipIn,
     UploadResultOut,
 )
 from nhac.services import clips as clip_service
 from nhac.services import concerts as concert_service
+from nhac.services import playback as playback_service
 from nhac.storage import get_storage
 from nhac.uploads import UploadError, ingest_upload
 
@@ -99,3 +105,59 @@ def get_concert(
     if concert is None:
         raise HTTPException(status_code=404, detail="concert not found")
     return ConcertWithClipsOut.model_validate(concert)
+
+
+# ---- Playback / theater mode ----
+
+
+@router.get("/playlists", response_model=list[PlaylistSummaryOut])
+def list_playlists(
+    session: Session = Depends(get_session),
+    user: User = Depends(get_current_user),
+) -> list[PlaylistSummaryOut]:
+    playlists = playback_service.list_playlists(session, user.id)
+    return [
+        PlaylistSummaryOut(
+            id=p.id,
+            type=p.type,
+            title=p.title,
+            concert_id=p.concert_id,
+            clip_count=len(p.items),
+        )
+        for p in playlists
+    ]
+
+
+@router.get("/playlists/{playlist_id}/queue", response_model=QueueOut)
+def get_playlist_queue(
+    playlist_id: str,
+    session: Session = Depends(get_session),
+) -> QueueOut:
+    playlist = playback_service.get_playlist(session, playlist_id)
+    if playlist is None:
+        raise HTTPException(status_code=404, detail="playlist not found")
+    return playback_service.build_queue(playlist)
+
+
+@router.post("/clips/{clip_id}/montage", response_model=MontageOut)
+async def create_montage(
+    clip_id: str,
+    session: Session = Depends(get_session),
+) -> MontageOut:
+    """Build (or return the cached) hype-cut montage for a clip.
+
+    Runs ffmpeg in a threadpool; the montage builder manages its own DB
+    session, so this route only re-reads the result.
+    """
+    clip = clip_service.get_clip(session, clip_id)
+    if clip is None:
+        raise HTTPException(status_code=404, detail="clip not found")
+    try:
+        result = await run_in_threadpool(build_montage, clip_id)
+    except MontageError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    return MontageOut(
+        clip_id=clip_id,
+        montage_url=get_storage().url_for(result.montage_key),
+        built=result.built,
+    )

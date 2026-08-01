@@ -74,20 +74,58 @@ one. Phase 2 refines with venue/geo + collaborative membership.
 
 ---
 
-## 4. Playback ✅
+## 4. Theater mode (playlist playback) ✅
 
 ```
-GET /clips/<id>  (routers/web.clip_player)
-  → <video src=media_url(raw_video_key)> + poster=thumbnail
-  → static/js/app.js draws an audio-reactive visualizer (Web Audio API)
+concert card ▶ / "Play all · shuffle" → GET /concerts/<id>/play
+  → 303 → GET /play/<playlist_id>   (routers/web.theater)
+      • services/playback.build_queue → items w/ media / montage / thumb URLs
+      • queue embedded in the page as JSON (</ escaped)
+  → static/js/player.js (NhacPlayer)
+      • SHUFFLE ON by default (persisted; Fisher-Yates, reshuffle on wrap)
+      • autoplay; if the browser blocks it → animated "tap to start" overlay
+      • screen = video only; mousemove/tap fades controls in, ~2.8s idle
+        fades them (and the cursor) out
+      • controls: play/pause · next · prev · shuffle · hype cut · mute ·
+        fullscreen · drag-to-seek progress; keyboard (space/n/p/s/h/m/f/←/→)
+      • cinematic track-intro card, blurred backdrop crossfade, eq bars,
+        Media Session metadata for lock-screen controls
 ```
 
-Local media is served by StaticFiles at `/media` with **HTTP range support**, so
-scrubbing works. Remote backends resolve to presigned/public URLs.
+`/play/<playlist>?track=<clip>` starts at a specific clip (concert rows use
+it). Local media is served at `/media` with **HTTP range support** so
+scrubbing works. Single-clip page (`/clips/<id>`) keeps the simple player +
+visualizer and links into the theater.
 
 ---
 
-## 5. Cleanest-audio selection ⛔ (Phase 2)
+## 5. Excitement detection → hype cut ✅
+
+```
+process_clip step 4.5 (every upload; backfill: scripts/build_highlights.py)
+  → analysis/excitement.compute_window_scores
+      • video pass: fps=8 tiny-frame signalstats YAVG → |Δ luma| = FLASH
+      • audio pass: astats per 0.5s window → RMS dB   = LOUDNESS
+      • percentile-normalize per clip, blend 0.6·loud + 0.4·flash, smooth
+  → select_highlights: greedy top windows → ~3.5s non-overlapping segments
+      (~60% coverage, ≤10) → clip_highlights rows
+
+POST /api/clips/<id>/montage   (or theater ⚡ button)
+  → pipeline/montage.build_montage
+      • video: trim+concat the highlight segments (hard cuts)
+      • audio: the ORIGINAL track, continuous — music never stops while
+        the visuals jump between the best moments; visuals loop if shorter
+      • exports/hype_<clip>.mp4, cached on clips.montage_key
+      • short clips (whole-clip highlight) reuse the raw file — no encode
+```
+
+Verified: on a synthetic quiet/dark → LOUD/FLASHING → quiet/dark video the
+analyzer selects the middle section (score ≈ 1.0) and the montage renders
+with continuous audio (`tests/test_excitement.py`, `tests/test_playback.py`).
+
+---
+
+## 6. Cleanest-audio selection ⛔ (Phase 2)
 
 Groundwork done: `audio/ffmpeg.estimate_audio_quality` scores each clip
 (volumedetect mean/peak; higher = cleaner) and stores
@@ -97,25 +135,27 @@ with a high-frequency crowd-noise / SNR proxy.
 
 ---
 
-## 6. Multi-angle b-roll ⛔ (Phase 2)
+## 7. Multi-angle b-roll ⛔ (Phase 2)
 
 ```
 inputs: N clips of the same concert-song
-audio : the cleanest clip (workflow 5)
+audio : the cleanest clip (workflow 6)
 video : ffmpeg concat/xfade across angles, synced to that audio → exports/
 ```
 
-Most complex Phase-2 item; prototype offline before wiring to UI.
+The single-clip hype cut (workflow 5) already built the trim/concat/mux
+machinery this needs — the remaining work is cross-clip sync.
 
 ---
 
 ## Status summary
 
-| Workflow                     | State |
-| ---------------------------- | ----- |
-| 1 Upload→identify→organize   | ✅    |
-| 2 Manual tagging             | ✅    |
-| 3 Auto-organization          | ✅    |
-| 4 Playback + visualizer      | ✅    |
-| 5 Cleanest-audio             | ⛔ (scoring stubbed in) |
-| 6 Multi-angle b-roll         | ⛔    |
+| Workflow                        | State |
+| ------------------------------- | ----- |
+| 1 Upload→identify→organize      | ✅    |
+| 2 Manual tagging                | ✅    |
+| 3 Auto-organization             | ✅    |
+| 4 Theater mode + visualizer     | ✅    |
+| 5 Excitement detection→hype cut | ✅    |
+| 6 Cleanest-audio                | ⛔ (scoring stubbed in) |
+| 7 Multi-angle b-roll            | ⛔    |

@@ -27,6 +27,20 @@ Legend: `[ ]` todo · `[~]` partial · `[x]` done.
 - [x] Demo mode for cold start
 - [x] End-to-end tested (pytest, live server verified)
 
+## Phase 1.5 — Theater & hype `[x]`
+
+- [x] Theater mode: playlist auto-plays, **shuffle default**, video-only
+      fullscreen stage, controls fade in on mouse move / fade out on idle
+- [x] Animated player chrome: track-intro cards, blurred backdrop crossfade,
+      eq bars, drag-to-seek, keyboard shortcuts, Media Session metadata
+- [x] Excitement detection per clip (flashing lights + crowd loudness)
+      stored as `clip_highlights`; runs in the upload pipeline + backfill script
+- [x] Hype-cut montage: best moments cut together while the original audio
+      plays continuously; on-demand via `POST /api/clips/{id}/montage`,
+      cached, toggleable in the theater (⚡)
+- [x] App-wide UI animation pass (cards, rows, play buttons, flash messages,
+      reduced-motion support)
+
 **MVP exit criteria — met:** upload a real clip → identified (or manually
 tagged) → auto-filed into a concert → played back with a visual. Demo mode shows
 sample concerts to a brand-new user.

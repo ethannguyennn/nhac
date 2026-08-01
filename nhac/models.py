@@ -132,6 +132,8 @@ class Clip(Base, TimestampMixin):
     raw_video_key: Mapped[str | None] = mapped_column(Text)
     audio_key: Mapped[str | None] = mapped_column(Text)
     thumbnail_key: Mapped[str | None] = mapped_column(Text)
+    # Rendered "hype cut" montage of the clip's most exciting moments.
+    montage_key: Mapped[str | None] = mapped_column(Text)
 
     # Media metadata
     original_filename: Mapped[str | None] = mapped_column(Text)
@@ -164,6 +166,11 @@ class Clip(Base, TimestampMixin):
     recognitions: Mapped[list[Recognition]] = relationship(
         back_populates="clip", cascade="all, delete-orphan"
     )
+    highlights: Mapped[list[ClipHighlight]] = relationship(
+        back_populates="clip",
+        cascade="all, delete-orphan",
+        order_by="ClipHighlight.start_seconds",
+    )
 
     @property
     def display_title(self) -> str:
@@ -178,6 +185,26 @@ class Clip(Base, TimestampMixin):
         if self.song:
             return self.song.artist
         return self.manual_artist
+
+
+class ClipHighlight(Base, TimestampMixin):
+    """An "exciting moment" inside a clip, found by nhac.analysis.excitement.
+
+    Scored from flashing stage lights (luma deltas) + crowd/PA loudness (RMS).
+    Used to render the "hype cut" montage and to seek to the good parts.
+    """
+
+    __tablename__ = "clip_highlights"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    clip_id: Mapped[str] = mapped_column(
+        ForeignKey("clips.id", ondelete="CASCADE"), index=True
+    )
+    start_seconds: Mapped[float] = mapped_column(Float)
+    end_seconds: Mapped[float] = mapped_column(Float)
+    score: Mapped[float] = mapped_column(Float, default=0.0)
+
+    clip: Mapped[Clip] = relationship(back_populates="highlights")
 
 
 class Recognition(Base, TimestampMixin):

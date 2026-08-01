@@ -23,10 +23,18 @@ providers are wired and one config flag away.
   default; AudD / AcoustID adapters included)
 - ✍️ **Manual tagging** fallback when detection misses
 - 🗂️ **Auto-organization** into concerts + playlists by artist/date
-- ▶️ **Playback** with an audio-reactive visualizer
+- 🎬 **Theater mode** — pick a playlist and it just plays: shuffle on by
+  default, video-only fullscreen stage, controls (pause/next/back/shuffle/…)
+  fade in on mouse move and melt away when you go still
+- 🔥 **Excitement detection** — every clip is scanned for its most hype
+  moments (flashing stage lights via luma deltas + crowd loudness via RMS)
+- ⚡ **Hype cut** — one tap renders a montage of those moments while the
+  music keeps playing (visuals jump, audio never stops)
+- ▶️ **Single-clip playback** with an audio-reactive visualizer
 - 🌱 **Demo mode** — seeded sample concerts (with real generated clips) so a
   fresh install feels alive
-- ✅ **Tested** — pytest covers the pipeline end-to-end
+- ✅ **Tested** — pytest covers the pipeline, excitement analysis, montage
+  rendering, and the queue API end-to-end
 
 ## Tech stack
 
@@ -69,17 +77,18 @@ nhac/
 ├── nhac/
 │   ├── main.py            # FastAPI app factory
 │   ├── config.py          # pydantic-settings
-│   ├── db.py  models.py   # SQLAlchemy engine + ORM
-│   ├── schemas.py         # Pydantic API contracts
+│   ├── db.py  models.py   # SQLAlchemy engine + ORM (incl. clip_highlights)
+│   ├── schemas.py         # Pydantic API contracts (incl. play queue)
 │   ├── storage/           # local + s3/r2 backends
 │   ├── audio/ffmpeg.py    # extract / probe / quality
+│   ├── analysis/          # excitement detection (flash + loudness)
 │   ├── fingerprint/       # base · mock · audd · acoustid
-│   ├── pipeline/          # process_clip · organize
-│   ├── services/          # clips · songs · concerts · playlists · users
-│   ├── routers/           # api.py (JSON) · web.py (HTML)
-│   ├── templates/  static/# Jinja2 UI + CSS/JS
+│   ├── pipeline/          # process_clip · organize · montage (hype cut)
+│   ├── services/          # clips · songs · concerts · playlists · playback · users
+│   ├── routers/           # api.py (JSON) · web.py (HTML + /play theater)
+│   ├── templates/  static/# Jinja2 UI + CSS/JS (incl. theater player)
 │   └── uploads.py         # upload orchestration
-├── scripts/seed_demo.py   # demo-mode content
+├── scripts/               # seed_demo.py · build_highlights.py (backfill)
 ├── tests/                 # pytest
 └── docs/                  # architecture, roadmap, workflows, decisions, setup, legal, notes
 ```

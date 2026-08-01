@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>{{ playlist.title }} · Nhạc</title>
+    <meta name="theme-color" content="#000000" />
+    <link rel="stylesheet" href="/static/css/player.css" />
+  </head>
+  <body class="theater">
+    <!-- Blurred ambient backdrop (two layers crossfade between tracks) -->
+    <div class="backdrop" id="backdrop-a"></div>
+    <div class="backdrop" id="backdrop-b"></div>
+    <div class="vignette"></div>
+
+    <video id="pv" playsinline preload="auto"></video>
+
+    <!-- Buffering indicator: the custom <video> has no `controls`, so without
+         this a network/disk stall gives zero feedback — just a frozen frame. -->
+    <div class="buffering" id="buffering" aria-hidden="true"><div class="spinner-ring"></div></div>
+
+    <!-- Chrome: hidden until the mouse moves / screen is tapped -->
+    <div class="ui" id="ui">
+      <header class="ui-top">
+        <a class="icon-btn" id="btn-back" href="{{ back_url }}" aria-label="Back">
+          <svg viewBox="0 0 24 24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
+        </a>
+        <div class="now">
+          <div class="eq paused" id="eq"><i></i><i></i><i></i><i></i></div>
+          <div class="now-text">
+            <div class="now-title" id="now-title"></div>
+            <div class="now-artist" id="now-artist"></div>
+          </div>
+        </div>
+        <div class="pl-name">{{ playlist.title }}</div>
+      </header>
+
+      <footer class="ui-bottom">
+        <div class="progress" id="progress" aria-label="Seek">
+          <div class="progress-track"></div>
+          <div class="progress-buffered" id="progress-buffered"></div>
+          <div class="progress-highlights" id="progress-highlights"></div>
+          <div class="progress-fill" id="progress-fill"><span class="knob"></span></div>
+        </div>
+        <div class="controls">
+          <div class="controls-side left">
+            <span class="time" id="time-now">0:00</span>
+            <span class="time dim">/</span>
+            <span class="time dim" id="time-total">0:00</span>
+          </div>
+          <div class="controls-center">
+            <button class="icon-btn toggleable" id="btn-shuffle" title="Shuffle (S)" aria-label="Shuffle">
+              <svg viewBox="0 0 24 24"><path d="M10.59 9.17 5.41 4 4 5.41l5.17 5.17 1.42-1.41zM14.5 4l2.04 2.04L4 18.59 5.41 20 17.96 7.46 20 9.5V4h-5.5zm.33 9.41-1.41 1.41 3.13 3.13L14.5 20H20v-5.5l-2.04 2.04-3.13-3.13z"/></svg>
+            </button>
+            <button class="icon-btn" id="btn-prev" title="Previous (P)" aria-label="Previous">
+              <svg viewBox="0 0 24 24"><path d="M18 6l-8.5 6L18 18V6zM6 6h2v12H6z"/></svg>
+            </button>
+            <button class="icon-btn primary" id="btn-play" title="Play / pause (Space)" aria-label="Play or pause">
+              <svg viewBox="0 0 24 24" class="ic-play"><path d="M8 5v14l11-7z"/></svg>
+              <svg viewBox="0 0 24 24" class="ic-pause"><path d="M6 5h4v14H6zM14 5h4v14h-4z"/></svg>
+            </button>
+            <button class="icon-btn" id="btn-next" title="Next (N)" aria-label="Next">
+              <svg viewBox="0 0 24 24"><path d="M6 6l8.5 6L6 18V6zM16 6h2v12h-2z"/></svg>
+            </button>
+            <button class="icon-btn toggleable" id="btn-hype" title="Hype cut — montage of the wildest moments (H)" aria-label="Hype cut">
+              <svg viewBox="0 0 24 24"><path d="M7 2v11h3v9l7-12h-4l4-8H7z"/></svg>
+            </button>
+          </div>
+          <div class="controls-side right">
+            <button class="icon-btn" id="btn-mute" title="Mute (M)" aria-label="Mute">
+              <svg viewBox="0 0 24 24" class="ic-vol"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3A4.5 4.5 0 0 0 14 7.97v8.05A4.5 4.5 0 0 0 16.5 12zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg>
+              <svg viewBox="0 0 24 24" class="ic-muted"><path d="M16.5 12A4.5 4.5 0 0 0 14 7.97v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51A8.96 8.96 0 0 0 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3 3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06a8.99 8.99 0 0 0 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4 9.91 6.09 12 8.18V4z"/></svg>
+            </button>
+            <button class="icon-btn" id="btn-fs" title="Fullscreen (F)" aria-label="Fullscreen">
+              <svg viewBox="0 0 24 24"><path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/></svg>
+            </button>
+          </div>
+        </div>
+      </footer>
+    </div>
+
+    <!-- Cinematic title card on each track change -->
+    <div class="track-intro" id="track-intro">
+      <div class="ti-title" id="ti-title"></div>
+      <div class="ti-artist" id="ti-artist"></div>
+    </div>
+
+    <!-- Autoplay-blocked fallback -->
+    <div class="start-overlay" id="start-overlay" hidden>
+      <button class="start-btn" id="start-btn" aria-label="Start playback">
+        <svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+      </button>
+      <div class="start-text">Tap to start the show</div>
+    </div>
+
+    <div class="toast" id="toast" role="status"></div>
+
+    <script id="queue-data" type="application/json">{{ queue_json | safe }}</script>
+    <script src="/static/js/player.js"></script>
+    <script>NhacPlayer.init({ startTrack: {{ (start_track or '') | tojson }} });</script>
+  </body>
+</html>

@@ -58,10 +58,11 @@ production hardening.
 | `schemas.py`          | Pydantic request/response contracts                        |
 | `storage/`            | `Storage` protocol + `local` and `s3` backends             |
 | `audio/ffmpeg.py`     | probe, extract audio sample, thumbnail, quality estimate   |
+| `analysis/`           | excitement detection: flash (luma Δ) + loudness (RMS) → highlights |
 | `fingerprint/`        | `Fingerprinter` ABC + `mock`/`audd`/`acoustid` + registry  |
-| `pipeline/`           | `process_clip` (orchestration) + `organize` (grouping)     |
-| `services/`           | Focused DB logic: clips, songs, concerts, playlists, users |
-| `routers/`            | `api` (JSON under `/api`) and `web` (HTML pages)            |
+| `pipeline/`           | `process_clip` + `organize` + `montage` (hype-cut render)  |
+| `services/`           | Focused DB logic: clips, songs, concerts, playlists, playback, users |
+| `routers/`            | `api` (JSON under `/api`) and `web` (HTML pages + `/play` theater) |
 | `uploads.py`          | Shared upload orchestration for web + API                  |
 | `templating.py`       | Jinja2 env + helpers (`media_url`)                          |
 

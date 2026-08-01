@@ -18,6 +18,7 @@ from pathlib import Path
 # Make the repo root importable when run as a script.
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from nhac.analysis.excitement import analyze_and_store  # noqa: E402
 from nhac.audio import ffmpeg  # noqa: E402
 from nhac.config import settings  # noqa: E402
 from nhac.constants import (  # noqa: E402
@@ -152,6 +153,11 @@ def main() -> None:
                     thumb_key = f"{STORAGE_PREFIX_THUMBNAIL}/{clip.id}.jpg"
                     storage.save_file(thumb_key, thumb_tmp, content_type="image/jpeg")
                     clip.thumbnail_key = thumb_key
+
+                try:
+                    analyze_and_store(session, clip, video_tmp)
+                except Exception as exc:  # noqa: BLE001 - demo data, non-fatal
+                    log.warning("highlight analysis skipped for %s: %s", title, exc)
 
                 add_clip_to_playlist(session, playlist, clip.id)
                 log.info("seeded clip: %s — %s", demo["artist"], title)
