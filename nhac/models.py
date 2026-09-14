@@ -91,6 +91,14 @@ class Concert(Base, TimestampMixin):
         back_populates="concert", cascade="all, delete-orphan"
     )
 
+    @property
+    def cover_thumbnail_key(self) -> str | None:
+        """First clip thumbnail available, used as a stand-in cover image."""
+        for clip in self.clips:
+            if clip.thumbnail_key:
+                return clip.thumbnail_key
+        return None
+
 
 class ConcertMember(Base, TimestampMixin):
     __tablename__ = "concert_members"

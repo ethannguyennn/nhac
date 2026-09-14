@@ -1,30 +1,29 @@
 {% extends "base.html" %}
 {% block title %}Upload · {{ app_name }}{% endblock %}
 {% block content %}
-<section class="narrow">
-  <h1>Add a concert clip</h1>
-  <p class="muted">
-    Pick a video from your phone or computer. Nhạc pulls the audio, finds the song,
-    and files it under the right show.
-  </p>
+<h1 class="display" style="margin-top: 24px">Feed it<br />a clip</h1>
+<p class="lede serif">We listen to the audio, name the song, and file it under the right night.</p>
 
-  {% if error %}<div class="flash flash-error">{{ error }}</div>{% endif %}
+{% if error %}<div class="flash flash-error">{{ error }}</div>{% endif %}
 
-  <form id="upload-form" action="/upload" method="post" enctype="multipart/form-data">
-    <label class="dropzone" for="file-input">
-      <input id="file-input" name="file" type="file" accept="video/*" required hidden />
-      <span id="dz-label">Tap to choose a video</span>
-      <span class="muted small">mp4 · mov · webm — up to 500&nbsp;MB</span>
-    </label>
-    <button id="submit-btn" class="btn btn-accent btn-block" type="submit" disabled>
-      Upload &amp; identify
-    </button>
-    <div id="progress" class="progress hidden">
-      <div class="spinner"></div>
-      <span id="progress-text">Uploading &amp; identifying the song…</span>
-    </div>
-  </form>
-</section>
+<form id="upload-form" action="/upload" method="post" enctype="multipart/form-data">
+  <label class="drop" for="file-input" id="dropZone">
+    <input id="file-input" name="file" type="file" accept="video/*" required hidden />
+    <div class="drop-label">Drop zone</div>
+    <div class="drop-title" id="dz-label">Drop your<br />concert clip</div>
+    <div class="drop-foot">mp4 · mov · webm — up to 500&nbsp;MB, or tap to browse</div>
+  </label>
+
+  <button id="submit-btn" class="btn btn-accent btn-block" type="submit" disabled>
+    Upload &amp; identify
+  </button>
+
+  <div id="progress" class="panel is-hidden">
+    <div class="eq eq--big"><b></b><b></b><b></b><b></b><b></b><b></b><b></b><b></b></div>
+    <div class="panel-title" id="progress-text">Listening to the crowd</div>
+    <div class="panel-foot">This can take a moment on longer clips · <span class="amber">working</span></div>
+  </div>
+</form>
 {% endblock %}
 {% block scripts %}
 <script src="/static/js/app.js"></script>

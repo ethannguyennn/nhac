@@ -1,40 +1,42 @@
 {% extends "base.html" %}
 {% block title %}{{ clip.display_title }} · {{ app_name }}{% endblock %}
 {% block content %}
-<section class="player">
-  <div class="stage">
-    <canvas id="viz" class="viz"></canvas>
-    {% if clip.raw_video_key %}
-    <video
-      id="clip-video"
-      class="clip-video"
-      src="{{ media_url(clip.raw_video_key) }}"
-      {% if clip.thumbnail_key %}poster="{{ media_url(clip.thumbnail_key) }}"{% endif %}
-      controls
-      playsinline
-    ></video>
-    {% else %}
-    <div class="stage-empty">Media unavailable</div>
-    {% endif %}
-  </div>
+<a class="backbar backbar--gap" href="/">← Library</a>
 
-  <div class="now-playing">
-    <h1>{{ clip.display_title }}</h1>
-    <p class="muted">{{ clip.display_artist or "Unknown artist" }}</p>
-    {% if clip.match_source and clip.match_source.value == "fingerprint" %}
-    <p class="chip chip-ok">auto-identified{% if clip.match_confidence %} · {{ (clip.match_confidence * 100)|round|int }}%{% endif %}</p>
-    {% elif clip.match_source and clip.match_source.value == "manual" %}
-    <p class="chip">manually tagged</p>
-    {% endif %}
+<div class="stage">
+  <canvas id="viz" class="viz"></canvas>
+  {% if clip.raw_video_key %}
+  <video
+    id="clip-video"
+    class="clip-video"
+    src="{{ media_url(clip.raw_video_key) }}"
+    {% if clip.thumbnail_key %}poster="{{ media_url(clip.thumbnail_key) }}"{% endif %}
+    controls
+    playsinline
+  ></video>
+  {% else %}
+  <div class="stage-empty">Media unavailable</div>
+  {% endif %}
+</div>
+
+<div class="now-playing">
+  <h1 class="stub-title" style="margin: 0">{{ clip.display_title }}</h1>
+  <p class="serif dim" style="margin: 6px 0 14px">{{ clip.display_artist or "Unknown artist" }}</p>
+  {% if clip.match_source and clip.match_source.value == "fingerprint" %}
+  <p class="chip chip-ok">auto-identified{% if clip.match_confidence %} · {{ (clip.match_confidence * 100)|round|int }}%{% endif %}</p>
+  {% elif clip.match_source and clip.match_source.value == "manual" %}
+  <p class="chip">manually tagged</p>
+  {% endif %}
+  <div style="display: flex; flex-direction: column; gap: 10px; margin-top: 18px">
     {% if theater_url %}
     <a class="btn btn-accent" href="{{ theater_url }}">▶ Watch in theater</a>
     {% endif %}
     {% if clip.concert_id %}
-    <a class="btn btn-ghost btn-sm" href="/concerts/{{ clip.concert_id }}">← Back to concert</a>
+    <a class="btn-ghost" href="/concerts/{{ clip.concert_id }}">← Back to concert</a>
     {% endif %}
-    <a class="btn btn-ghost btn-sm" href="/clips/{{ clip.id }}/tag">Fix song info</a>
+    <a class="btn-ghost" href="/clips/{{ clip.id }}/tag">Fix song info</a>
   </div>
-</section>
+</div>
 {% endblock %}
 {% block scripts %}
 <script src="/static/js/app.js"></script>

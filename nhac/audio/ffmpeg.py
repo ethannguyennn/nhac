@@ -15,7 +15,13 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from nhac.config import settings
-from nhac.constants import FINGERPRINT_SAMPLE_SECONDS, FINGERPRINT_SAMPLE_START_SECONDS
+from nhac.constants import (
+    FFMPEG_ANALYSIS_TIMEOUT_SECONDS,
+    FFMPEG_SAMPLE_TIMEOUT_SECONDS,
+    FFPROBE_TIMEOUT_SECONDS,
+    FINGERPRINT_SAMPLE_SECONDS,
+    FINGERPRINT_SAMPLE_START_SECONDS,
+)
 from nhac.logging_config import get_logger
 
 log = get_logger(__name__)
@@ -33,9 +39,18 @@ class MediaInfo:
     has_audio: bool = False
 
 
-def _run(cmd: list[str]) -> subprocess.CompletedProcess[str]:
+def _run(cmd: list[str], *, timeout: float) -> subprocess.CompletedProcess[str]:
+    """Run an ffmpeg/ffprobe command, bounded by ``timeout``.
+
+    ``subprocess.run`` kills the child process on timeout, so a hung ffmpeg
+    can't outlive the call and leak a process. The timeout surfaces as an
+    ordinary ``FfmpegError`` so existing callers' error handling applies.
+    """
     log.debug("run: %s", " ".join(cmd))
-    proc = subprocess.run(cmd, capture_output=True, text=True)
+    try:
+        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
+    except subprocess.TimeoutExpired as exc:
+        raise FfmpegError(f"{cmd[0]} timed out after {timeout:.0f}s") from exc
     if proc.returncode != 0:
         raise FfmpegError(f"{cmd[0]} exited {proc.returncode}: {proc.stderr[-500:]}")
     return proc
@@ -53,7 +68,7 @@ def probe(input_path: Path) -> MediaInfo:
         "-show_streams",
         str(input_path),
     ]
-    proc = _run(cmd)
+    proc = _run(cmd, timeout=FFPROBE_TIMEOUT_SECONDS)
     data = json.loads(proc.stdout or "{}")
 
     info = MediaInfo()
@@ -101,7 +116,7 @@ def extract_audio_sample(input_path: Path, output_path: Path) -> Path:
         "-y",
         str(output_path),
     ]
-    _run(cmd)
+    _run(cmd, timeout=FFMPEG_SAMPLE_TIMEOUT_SECONDS)
     if not output_path.exists() or output_path.stat().st_size == 0:
         raise FfmpegError("audio sample extraction produced no output")
     return output_path
@@ -127,7 +142,7 @@ def extract_thumbnail(input_path: Path, output_path: Path, at_seconds: float = 1
         str(output_path),
     ]
     try:
-        _run(cmd)
+        _run(cmd, timeout=FFMPEG_SAMPLE_TIMEOUT_SECONDS)
     except FfmpegError as exc:
         log.warning("thumbnail extraction failed: %s", exc)
         return None
@@ -152,7 +167,14 @@ def estimate_audio_quality(input_path: Path) -> float:
         "null",
         "-",
     ]
-    proc = subprocess.run(cmd, capture_output=True, text=True)
+    try:
+        proc = subprocess.run(
+            cmd, capture_output=True, text=True, timeout=FFMPEG_ANALYSIS_TIMEOUT_SECONDS
+        )
+    except subprocess.TimeoutExpired:
+        # Best-effort score: a timeout is not worth failing the upload over.
+        log.warning("audio quality estimate timed out for %s", input_path.name)
+        return 0.0
     stderr = proc.stderr or ""
     mean = _parse_db(stderr, r"mean_volume:\s*(-?\d+(?:\.\d+)?) dB")
     peak = _parse_db(stderr, r"max_volume:\s*(-?\d+(?:\.\d+)?) dB")

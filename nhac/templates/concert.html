@@ -1,48 +1,62 @@
 {% extends "base.html" %}
 {% block title %}{{ concert.title }} · {{ app_name }}{% endblock %}
 {% block content %}
-<section class="concert-header">
-  <div class="concert-art large"
-    {% if concert.cover_image_url %}style="background-image:url('{{ concert.cover_image_url }}')"{% endif %}></div>
-  <div class="concert-header-main">
-    <h1>{{ concert.title }}</h1>
-    <p class="muted">
-      {{ concert.venue or concert.artist or "Concert" }}{% if concert.performed_on %} · {{ concert.performed_on.strftime("%B %d, %Y") }}{% endif %}
-    </p>
-    <p class="muted small">{{ clips|length }} clip{{ "s" if clips|length != 1 else "" }}</p>
-    {% if clips %}
-    <a class="btn btn-accent play-all" href="/concerts/{{ concert.id }}/play">
-      <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
-      Play all · shuffle
-    </a>
-    {% endif %}
-  </div>
-</section>
+<a class="backbar" href="/">← All shows</a>
 
-<section>
-  <div class="clip-row-list">
-    {% for clip in clips %}
-    <div class="clip-row" style="animation-delay: {{ loop.index0 * 45 }}ms">
-      <a class="row-link" href="/play/{{ playlist_id }}?track={{ clip.id }}"
-         aria-label="Play {{ clip.display_title }}"></a>
-      <span class="clip-index">
-        <span class="idx-num">{{ loop.index }}</span>
-        <svg class="idx-play" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
-      </span>
-      <span class="clip-thumb"
-        {% if clip.thumbnail_key %}style="background-image:url('{{ media_url(clip.thumbnail_key) }}')"{% endif %}></span>
-      <span class="clip-row-main">
-        <span class="clip-row-title">{{ clip.display_title }}</span>
-        <span class="muted small">{{ clip.display_artist or "Unknown artist" }}</span>
-      </span>
-      {% if clip.duration_seconds %}
-      <span class="muted small">{{ "%d:%02d"|format((clip.duration_seconds // 60)|int, (clip.duration_seconds % 60)|int) }}</span>
-      {% endif %}
-      <a class="row-detail" href="/clips/{{ clip.id }}" title="Clip details" aria-label="Clip details">
-        <svg viewBox="0 0 24 24"><path d="M12 8a2 2 0 1 0 0-4 2 2 0 0 0 0 4zm0 2a2 2 0 1 0 0 4 2 2 0 0 0 0-4zm0 6a2 2 0 1 0 0 4 2 2 0 0 0 0-4z"/></svg>
-      </a>
-    </div>
-    {% endfor %}
+<div class="hero" style="--glow: {{ glow }}">
+  <div class="hero-tint"></div>
+  <div class="hero-img" {% if concert.cover_thumbnail_key %}style="background-image:url('{{ media_url(concert.cover_thumbnail_key) }}')"{% endif %}>
+    <div class="hero-grad"></div>
+    {% if concert.performed_on %}<span class="stamp stamp--tilt">{{ concert.performed_on.strftime("%d·%m·%y") }}</span>{% endif %}
   </div>
-</section>
+  <h1 class="hero-title">{{ concert.title }}</h1>
+</div>
+
+<div class="factgrid">
+  <div class="fact">
+    <div class="fact-label">Venue</div>
+    <div class="fact-val serif">{{ concert.venue or "Unknown" }}</div>
+  </div>
+  <div class="fact">
+    <div class="fact-label">Night of</div>
+    <div class="fact-val serif">{{ concert.performed_on.strftime("%B %d, %Y") if concert.performed_on else "Unknown" }}</div>
+  </div>
+</div>
+
+{% if clips %}
+<div class="cta-row">
+  <a class="btn btn-solid" href="/concerts/{{ concert.id }}/play">▶ Start the show</a>
+  <a class="btn-square" href="/concerts/{{ concert.id }}/play?hype=1" title="Hype cut — best moments only">⚡</a>
+</div>
+{% endif %}
+
+<div class="sec-head sec-head--rule">
+  <h2 class="eyebrow">Setlist · your clips</h2>
+  <span class="micro-wide dim">{{ clips|length }} clip{{ "s" if clips|length != 1 }}</span>
+</div>
+
+<div class="clip-row-list">
+  {% for clip in clips %}
+  <div class="clip-row" style="animation-delay: {{ loop.index0 * 45 }}ms">
+    <a class="row-link" href="/play/{{ playlist_id }}?track={{ clip.id }}" aria-label="Play {{ clip.display_title }}"></a>
+    <span class="clip-index">
+      <span class="idx-num">{{ "%02d"|format(loop.index) }}</span>
+      <svg class="idx-play" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+    </span>
+    <span class="clip-thumb" {% if clip.thumbnail_key %}style="background-image:url('{{ media_url(clip.thumbnail_key) }}')"{% endif %}></span>
+    <span class="clip-row-main">
+      <span class="clip-row-title">{{ clip.display_title }}</span>
+      <span class="clip-row-artist">{{ clip.display_artist or "Unknown artist" }}</span>
+    </span>
+    {% if clip.duration_seconds %}
+    <span class="clip-row-dur">{{ "%d:%02d"|format((clip.duration_seconds // 60)|int, (clip.duration_seconds % 60)|int) }}</span>
+    {% else %}
+    <span></span>
+    {% endif %}
+    <a class="row-detail" href="/clips/{{ clip.id }}" title="Clip details" aria-label="Clip details">
+      <svg viewBox="0 0 24 24"><path d="M12 8a2 2 0 1 0 0-4 2 2 0 0 0 0 4zm0 2a2 2 0 1 0 0 4 2 2 0 0 0 0-4zm0 6a2 2 0 1 0 0 4 2 2 0 0 0 0-4z"/></svg>
+    </a>
+  </div>
+  {% endfor %}
+</div>
 {% endblock %}

@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <title>{{ playlist.title }} · Nhạc</title>
     <meta name="theme-color" content="#000000" />
+    <link rel="stylesheet" href="/static/css/tokens.css" />
     <link rel="stylesheet" href="/static/css/player.css" />
   </head>
   <body class="theater">
@@ -88,15 +89,22 @@
     <!-- Autoplay-blocked fallback -->
     <div class="start-overlay" id="start-overlay" hidden>
       <button class="start-btn" id="start-btn" aria-label="Start playback">
+        <span class="start-btn-label">Tear in</span>
+        <span class="start-btn-perf"></span>
         <svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
       </button>
-      <div class="start-text">Tap to start the show</div>
+      <div class="start-text">Your browser wants a tap before sound starts</div>
     </div>
 
     <div class="toast" id="toast" role="status"></div>
 
     <script id="queue-data" type="application/json">{{ queue_json | safe }}</script>
     <script src="/static/js/player.js"></script>
-    <script>NhacPlayer.init({ startTrack: {{ (start_track or '') | tojson }} });</script>
+    <script>
+      NhacPlayer.init({
+        startTrack: {{ (start_track or '') | tojson }},
+        hype: {{ start_hype | tojson }}
+      });
+    </script>
   </body>
 </html>

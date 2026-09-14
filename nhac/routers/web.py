@@ -30,10 +30,11 @@ def index(
 ) -> HTMLResponse:
     concerts = concert_service.list_concerts(session, user.id)
     unidentified = concert_service.list_unidentified_clips(session, user.id)
+    stats = concert_service.get_library_stats(session, user.id)
     return templates.TemplateResponse(
         request,
         "index.html",
-        {"concerts": concerts, "unidentified": unidentified, "msg": msg},
+        {"concerts": concerts, "unidentified": unidentified, "stats": stats, "msg": msg},
     )
 
 
@@ -90,13 +91,20 @@ def concert_detail(
     return templates.TemplateResponse(
         request,
         "concert.html",
-        {"concert": concert, "clips": clips, "playlist_id": playlist.id, "msg": msg},
+        {
+            "concert": concert,
+            "clips": clips,
+            "playlist_id": playlist.id,
+            "glow": concert_service.concert_glow(concert.id),
+            "msg": msg,
+        },
     )
 
 
 @router.get("/concerts/{concert_id}/play")
 def concert_play(
     concert_id: str,
+    hype: bool = False,
     session: Session = Depends(get_session),
 ) -> RedirectResponse:
     """Jump straight into theater mode for a concert's auto-playlist."""
@@ -105,7 +113,8 @@ def concert_play(
         return RedirectResponse("/?msg=Concert+not+found", status_code=303)
     playlist = ensure_concert_playlist(session, concert)
     session.commit()
-    return RedirectResponse(f"/play/{playlist.id}", status_code=303)
+    suffix = "?hype=1" if hype else ""
+    return RedirectResponse(f"/play/{playlist.id}{suffix}", status_code=303)
 
 
 @router.get("/play/{playlist_id}", response_class=HTMLResponse)
@@ -113,6 +122,7 @@ def theater(
     playlist_id: str,
     request: Request,
     track: str | None = None,
+    hype: bool = False,
     session: Session = Depends(get_session),
 ) -> HTMLResponse:
     """Immersive playlist player: video only, controls on mouse move."""
@@ -136,6 +146,7 @@ def theater(
             "playlist": playlist,
             "queue_json": queue_json,
             "start_track": track,
+            "start_hype": hype,
             "back_url": (
                 f"/concerts/{playlist.concert_id}" if playlist.concert_id else "/"
             ),

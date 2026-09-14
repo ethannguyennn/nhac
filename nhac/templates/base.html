@@ -5,23 +5,29 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <title>{% block title %}{{ app_name }}{% endblock %}</title>
     <meta name="theme-color" content="#0b0b0f" />
+    <link rel="stylesheet" href="/static/css/tokens.css" />
     <link rel="stylesheet" href="/static/css/app.css" />
   </head>
-  <body>
-    <header class="topbar">
-      <a class="brand" href="/">Nhạc<span class="brand-dot">·</span></a>
-      <a class="btn btn-accent btn-sm" href="/upload">＋ Upload</a>
-    </header>
+  <body{% if glow %} style="--glow: {{ glow }}"{% endif %}>
+    <div class="bg-blob"></div>
+    <div class="grain"></div>
 
-    {% if msg %}
-    <div class="flash" role="status">{{ msg }}</div>
-    {% endif %}
+    <main class="main">
+      {% if msg %}
+      <div class="flash" role="status">{{ msg }}</div>
+      {% endif %}
 
-    <main class="container">{% block content %}{% endblock %}</main>
+      {% block content %}{% endblock %}
 
-    <footer class="footer">
-      <p>For personal use. You’re responsible for the footage you upload and share.</p>
-    </footer>
+      <footer class="footer">
+        <p>For personal use. You’re responsible for the footage you upload and share.</p>
+      </footer>
+    </main>
+
+    <nav class="tabbar">
+      <a class="tab {{ 'is-on' if not request.url.path.startswith('/upload') else '' }}" href="/">01 Library</a>
+      <a class="tab {{ 'is-on' if request.url.path.startswith('/upload') else '' }}" href="/upload">02 Upload</a>
+    </nav>
 
     {% block scripts %}{% endblock %}
   </body>
