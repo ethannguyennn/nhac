@@ -38,7 +38,17 @@ pick video ──POST /upload─────▶ routers/web.upload_submit (or ap
 **Sample, not full track:** ~15s starting 5s in (`FINGERPRINT_SAMPLE_*`) —
 cheaper per API call, skips the noisy intro.
 
-Covered by `tests/test_upload_flow.py::test_upload_identifies_and_organizes`.
+**Failure path:** any exception mid-pipeline → rollback, then `status=failed`
++ `error_message` committed, so a clip never sits in `processing` forever.
+That rollback also discards the not-yet-committed `thumbnail_key`/`audio_key`,
+so the files those steps already wrote would be orphaned — `process_clip`
+therefore deletes the derived objects this run wrote that the persisted row
+doesn't reference (`_discard_unreferenced`). The raw upload is kept (user's
+footage, and what a retry re-reads); undeletable keys are logged at WARNING
+for a later sweep.
+
+Covered by `tests/test_upload_flow.py::test_upload_identifies_and_organizes`
+and `tests/test_upload_failure_cleanup.py`.
 
 ---
 

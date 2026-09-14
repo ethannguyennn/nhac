@@ -17,11 +17,22 @@ are roughly ordered by "matters before anyone but you uses this."
 
 ## 1. Correctness & robustness (do these regardless of scale)
 
-- [ ] **Upload failure cleanup**: if `process_clip` throws mid-pipeline (ffmpeg
-      crash, disk full), confirm the `Clip` row lands in a sane terminal state
-      (not stuck "processing" forever) and orphaned storage objects
-      (thumbnail/audio sample written before the crash) get cleaned up or are
-      at least logged for a sweep job.
+- [x] **Upload failure cleanup** — DONE. Two halves; one already held, one
+      leaked. *Terminal state* was fine: the handler rolls back, re-reads the
+      clip and commits `failed` + `error_message`, so nothing sticks in
+      `processing` — now pinned by a test rather than assumed. *Orphaned
+      storage* was real: the thumbnail (step 2) and audio sample (step 3) are
+      written to storage immediately, but their keys only reach the DB at a
+      LATER commit, so the handler's `session.rollback()` threw the keys away
+      while the files stayed on disk — bytes no row referenced and nothing
+      would ever reclaim, or even name. `process_clip` now tracks the derived
+      keys it writes and, *after* the terminal state is committed, deletes the
+      ones the persisted row doesn't reference (`_discard_unreferenced`).
+      The raw upload is never touched (it's the user's footage, and what any
+      retry would re-read), and a key that can't be deleted is logged at
+      WARNING *with the key* so a sweep job has something to work from.
+      Pinned by `tests/test_upload_failure_cleanup.py` (7 tests; the 3 orphan
+      ones verified to fail against pre-fix behaviour).
 - [ ] **Retry / dead-letter for fingerprint provider errors**: `audd`/`acoustid`
       are network calls — confirm a timeout or 5xx from the provider doesn't
       crash the pipeline thread; it should fall back to `unidentified` (manual

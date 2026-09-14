@@ -103,6 +103,13 @@ Module map:
   sibling thread's `mkdir()` of the same not-yet-existing directory — this
   caused a real intermittent 500 under concurrent montage builds on Windows.
   Safety checks use `os.path.normpath` + string prefix comparison instead.
+- **Derived storage writes must be tracked for cleanup.** `process_clip`
+  writes `thumbnails/<id>.jpg` and `audio/<id>.mp3` to storage *before* the
+  commit that persists their keys, so the failure handler's `rollback()` used
+  to strand the files with no row referencing them. It now records each
+  derived key and, after committing the terminal state, deletes the ones the
+  persisted row doesn't reference (`_discard_unreferenced`). Add any new
+  derived artifact to that list — the raw upload deliberately stays.
 - **Single-user MVP.** `deps.get_current_user` always returns one seeded
   local account (`services/users.get_or_create_default_user`). There is no
   real auth yet — don't assume multi-user isolation.

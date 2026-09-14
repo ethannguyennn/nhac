@@ -37,6 +37,38 @@ from nhac.storage import get_storage
 log = get_logger(__name__)
 
 
+def _discard_unreferenced(storage, keys: list[str], clip: Clip | None) -> None:
+    """Delete derived artifacts this run wrote that the clip row doesn't point at.
+
+    The failure path rolls the session back, which throws away the in-memory
+    ``thumbnail_key``/``audio_key`` assignments while their files stay in
+    storage — leaving orphans that no row references and nothing would ever
+    reclaim. Call this only AFTER the terminal state is committed, so ``clip``
+    reflects what
+    actually persisted and a key that did survive the rollback is kept.
+
+    Deletion is best-effort by design: a key we can't remove is logged (at
+    WARNING, with the key) so a sweep job has something to work from, and the
+    original pipeline failure stays the reason recorded on the clip.
+    """
+    referenced = set()
+    if clip is not None:
+        referenced = {
+            clip.raw_video_key,
+            clip.audio_key,
+            clip.thumbnail_key,
+            clip.montage_key,
+        }
+    for key in keys:
+        if key in referenced:
+            continue
+        try:
+            storage.delete(key)
+            log.info("discarded orphaned storage object %s", key)
+        except Exception as exc:  # noqa: BLE001 - cleanup must not mask the cause
+            log.warning("orphaned storage object left behind: %s (%s)", key, exc)
+
+
 @dataclass
 class ProcessResult:
     clip_id: str
@@ -52,6 +84,9 @@ def process_clip(clip_id: str) -> ProcessResult:
     session = SessionLocal()
     storage = get_storage()
     tmp_dir = Path(tempfile.mkdtemp(prefix="nhac_"))
+    # Derived objects written to storage during this run. Their keys only reach
+    # the DB on a later commit, so on failure these are what leaks.
+    derived_keys: list[str] = []
     try:
         clip = session.get(Clip, clip_id)
         if clip is None:
@@ -81,6 +116,7 @@ def process_clip(clip_id: str) -> ProcessResult:
         if ffmpeg.extract_thumbnail(raw_path, thumb_tmp):
             key = f"{STORAGE_PREFIX_THUMBNAIL}/{clip.id}.jpg"
             storage.save_file(key, thumb_tmp, content_type="image/jpeg")
+            derived_keys.append(key)
             clip.thumbnail_key = key
 
         # 3. Extract audio sample.
@@ -96,6 +132,7 @@ def process_clip(clip_id: str) -> ProcessResult:
         ffmpeg.extract_audio_sample(raw_path, audio_tmp)
         audio_key = f"{STORAGE_PREFIX_AUDIO}/{clip.id}.mp3"
         storage.save_file(audio_key, audio_tmp, content_type="audio/mpeg")
+        derived_keys.append(audio_key)
         clip.audio_key = audio_key
 
         # 4. Best-effort audio quality score (Phase-2 groundwork).
@@ -171,6 +208,7 @@ def process_clip(clip_id: str) -> ProcessResult:
             clip.status = ClipStatus.FAILED
             clip.error_message = str(exc)[:500]
             session.commit()
+        _discard_unreferenced(storage, derived_keys, clip)
         return ProcessResult(clip_id, ClipStatus.FAILED, False, message=str(exc))
     finally:
         session.close()
