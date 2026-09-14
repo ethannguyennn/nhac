@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import mimetypes
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -18,6 +19,11 @@ from nhac.routers.web import router as web_router
 log = get_logger(__name__)
 
 STATIC_DIR = Path(__file__).parent / "static"
+
+# Some OS mimetypes databases (notably Windows) don't know modern font/web
+# types, so StaticFiles falls back to application/octet-stream for them.
+mimetypes.add_type("font/woff2", ".woff2")
+mimetypes.add_type("font/woff", ".woff")
 
 
 @asynccontextmanager

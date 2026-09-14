@@ -27,6 +27,7 @@ from pathlib import Path
 from sqlalchemy.orm import Session
 
 from nhac.config import settings
+from nhac.constants import FFMPEG_ANALYSIS_TIMEOUT_SECONDS
 from nhac.logging_config import get_logger
 
 log = get_logger(__name__)
@@ -75,7 +76,17 @@ def _run_metadata_pass(args: list[str]) -> str:
     """Run ffmpeg with a ``metadata=print:file=-`` filter; return stdout."""
     cmd = [settings.ffmpeg_bin, "-hide_banner", "-nostats", "-loglevel", "error", *args]
     log.debug("analysis pass: %s", " ".join(cmd))
-    proc = subprocess.run(cmd, capture_output=True, text=True)
+    try:
+        proc = subprocess.run(
+            cmd, capture_output=True, text=True, timeout=FFMPEG_ANALYSIS_TIMEOUT_SECONDS
+        )
+    except subprocess.TimeoutExpired as exc:
+        # This is a full-video decode — the most expensive pass in the app and
+        # the likeliest to hang on a malformed file. Callers treat analysis as
+        # non-fatal (a clip without highlights still identifies and plays).
+        raise AnalysisError(
+            f"ffmpeg analysis pass timed out after {FFMPEG_ANALYSIS_TIMEOUT_SECONDS:.0f}s"
+        ) from exc
     if proc.returncode != 0:
         raise AnalysisError(f"ffmpeg analysis pass failed: {proc.stderr[-400:]}")
     return proc.stdout or ""

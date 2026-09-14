@@ -31,7 +31,7 @@ from pathlib import Path
 from nhac.analysis.excitement import Highlight, analyze_and_store
 from nhac.audio import ffmpeg as ff
 from nhac.config import settings
-from nhac.constants import STORAGE_PREFIX_EXPORT
+from nhac.constants import FFMPEG_RENDER_TIMEOUT_SECONDS, STORAGE_PREFIX_EXPORT
 from nhac.db import SessionLocal
 from nhac.logging_config import get_logger
 from nhac.models import Clip
@@ -75,7 +75,17 @@ class MontageResult:
 def _run_ffmpeg(args: list[str]) -> None:
     cmd = [settings.ffmpeg_bin, "-hide_banner", "-nostats", "-loglevel", "error", *args]
     log.debug("montage: %s", " ".join(cmd))
-    proc = subprocess.run(cmd, capture_output=True, text=True)
+    try:
+        proc = subprocess.run(
+            cmd, capture_output=True, text=True, timeout=FFMPEG_RENDER_TIMEOUT_SECONDS
+        )
+    except subprocess.TimeoutExpired as exc:
+        # Critical: this runs while holding the per-clip build lock. An
+        # unbounded hang here would deadlock every later request for this
+        # clip, not just this one. Fail loudly so the lock is released.
+        raise MontageError(
+            f"montage render timed out after {FFMPEG_RENDER_TIMEOUT_SECONDS:.0f}s"
+        ) from exc
     if proc.returncode != 0:
         raise MontageError(f"ffmpeg failed: {proc.stderr[-500:]}")
 

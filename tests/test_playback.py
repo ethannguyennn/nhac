@@ -104,7 +104,7 @@ def test_concert_page_links_theater(client, sample_video, force_match):
     clip = _upload(client, sample_video)
     page = client.get(f"/concerts/{clip['concert_id']}")
     assert page.status_code == 200
-    assert "Play all" in page.text
+    assert "Start the show" in page.text
     assert "/play/" in page.text
 
 

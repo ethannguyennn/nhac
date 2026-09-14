@@ -2,14 +2,23 @@
 window.Nhac = (function () {
   "use strict";
 
+  // Purely cosmetic — the real work happens server-side during this same
+  // (blocking) request. Keeps the wait feeling alive instead of a dead spinner.
+  var UPLOAD_STATUSES = [
+    "Listening to the crowd",
+    "Isolating the stage mix",
+    "Matching the fingerprint",
+  ];
+
   /** Upload page: enable submit on file pick, show a processing state on submit. */
   function initUpload() {
     const input = document.getElementById("file-input");
     const label = document.getElementById("dz-label");
-    const dz = document.querySelector(".dropzone");
+    const dz = document.getElementById("dropZone");
     const btn = document.getElementById("submit-btn");
     const form = document.getElementById("upload-form");
     const progress = document.getElementById("progress");
+    const statusText = document.getElementById("progress-text");
     if (!input || !form) return;
 
     input.addEventListener("change", function () {
@@ -23,8 +32,12 @@ window.Nhac = (function () {
 
     form.addEventListener("submit", function () {
       btn.disabled = true;
-      btn.classList.add("hidden");
-      progress.classList.remove("hidden");
+      btn.classList.add("is-hidden");
+      progress.classList.remove("is-hidden");
+      UPLOAD_STATUSES.forEach(function (text, i) {
+        if (i === 0) return; // first status is already showing
+        setTimeout(function () { statusText.textContent = text; }, i * 1400);
+      });
     });
   }
 

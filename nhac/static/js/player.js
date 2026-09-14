@@ -473,7 +473,9 @@ window.NhacPlayer = (function () {
     if (!queue.length) return;
 
     shuffle = lsGetBool(LS.shuffle, true); // shuffle is the default experience
-    hype = lsGetBool(LS.hype, false);
+    // An explicit ?hype=1 launch (e.g. the concert page's ⚡ button) wins for
+    // this session without overwriting the user's saved default preference.
+    hype = opts.hype === true ? true : lsGetBool(LS.hype, false);
     els.video.muted = lsGetBool(LS.muted, false);
     document.body.classList.toggle("muted", els.video.muted);
     els.btnShuffle.classList.toggle("on", shuffle);

@@ -6,6 +6,7 @@ from pathlib import Path
 
 from fastapi.templating import Jinja2Templates
 
+from nhac.services.concerts import concert_glow
 from nhac.storage import get_storage
 
 TEMPLATES_DIR = Path(__file__).parent / "templates"
@@ -19,4 +20,5 @@ def _media_url(key: str | None) -> str | None:
 
 # Helpers available in every template.
 templates.env.globals["media_url"] = _media_url
+templates.env.globals["concert_glow"] = concert_glow
 templates.env.globals["app_name"] = "Nhạc"

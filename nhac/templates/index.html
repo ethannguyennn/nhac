@@ -1,58 +1,86 @@
 {% extends "base.html" %}
 {% block content %}
-<section class="hero">
-  <h1>Relive the moment.</h1>
-  <p class="muted">Your concert clips, identified and organized into replayable sets.</p>
-</section>
+
+<div class="ticker">
+  <div class="ticker-track">
+    {% for _ in range(2) %}
+    <span class="ticker-text">
+      {{ stats.show_count }} show{{ "s" if stats.show_count != 1 }} ·
+      {{ stats.clip_count }} clip{{ "s" if stats.clip_count != 1 }} ·
+      {{ stats.total_duration_label }} of footage ·
+      {% if stats.last_upload_label %}last upload {{ stats.last_upload_label }} · {% endif %}
+      {% if stats.unidentified_count %}{{ stats.unidentified_count }} clip{{ "s" if stats.unidentified_count != 1 }} need{{ "s" if stats.unidentified_count == 1 }} a name ·{% endif %}
+    </span>
+    {% endfor %}
+  </div>
+</div>
+
+<div class="masthead">
+  <h1 class="wordmark">Nhạc</h1>
+  <div class="masthead-meta">Concert<br />memory</div>
+</div>
+
+<div class="statbar">
+  <div class="stat">{{ "%02d"|format(stats.show_count) }} <span>shows</span></div>
+  <div class="stat">{{ stats.clip_count }} <span>clips</span></div>
+  <div class="stat">{{ stats.total_duration_label }} <span>total</span></div>
+</div>
 
 {% if unidentified %}
-<section class="needs-tag">
-  <h2 class="section-title">Needs a name</h2>
-  <p class="muted small">We couldn’t auto-detect these — tag them so they find their concert.</p>
-  <div class="clip-row-list">
-    {% for clip in unidentified %}
-    <a class="clip-row" href="/clips/{{ clip.id }}/tag" style="animation-delay: {{ loop.index0 * 50 }}ms">
-      <span class="clip-thumb small"
-        {% if clip.thumbnail_key %}style="background-image:url('{{ media_url(clip.thumbnail_key) }}')"{% endif %}></span>
-      <span class="clip-row-main">
-        <span class="clip-row-title">{{ clip.original_filename or "Untitled clip" }}</span>
-        <span class="muted small">Tap to add artist &amp; song</span>
-      </span>
-      <span class="chip">Tag</span>
-    </a>
-    {% endfor %}
-  </div>
-</section>
+<h2 class="eyebrow" style="margin-top: 26px">[ 01 ] Needs a name</h2>
+<div class="strip">
+  {% for clip in unidentified %}
+  <a class="clip-card {{ 'clip-card--hot' if loop.first }}" href="/clips/{{ clip.id }}/tag" style="animation-delay: {{ loop.index0 * 50 }}ms">
+    <div class="clip-card-top">
+      <span class="micro">clip</span>
+      {% if loop.first %}<span class="eq"><i></i><i></i><i></i><i></i></span>{% else %}<span class="micro dim">—</span>{% endif %}
+    </div>
+    <div class="clip-card-body">
+      <div class="clip-card-title">{{ clip.original_filename or "Untitled" }}</div>
+      <div class="clip-card-meta {{ 'amber' if loop.first }}">label it</div>
+    </div>
+  </a>
+  {% endfor %}
+</div>
 {% endif %}
 
-<section>
-  <h2 class="section-title">Your concerts</h2>
-  {% if concerts %}
-  <div class="card-grid">
-    {% for concert in concerts %}
-    <div class="concert-card" style="animation-delay: {{ loop.index0 * 60 }}ms">
-      <div class="concert-art"
-        {% if concert.cover_image_url %}style="background-image:url('{{ concert.cover_image_url }}')"{% endif %}>
-        {% if concert.is_demo %}<span class="chip chip-demo">demo</span>{% endif %}
-        <a class="play-fab" href="/concerts/{{ concert.id }}/play"
-           aria-label="Play {{ concert.title }} (shuffle)">
-          <svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
-        </a>
-      </div>
-      <a class="concert-meta" href="/concerts/{{ concert.id }}">
-        <div class="concert-title">{{ concert.title }}</div>
-        <div class="muted small">
-          {{ concert.venue or concert.artist or "Concert" }}{% if concert.performed_on %} · {{ concert.performed_on.strftime("%b %Y") }}{% endif %}
-        </div>
-      </a>
+{% if concerts %}
+{% set featured = concerts[0] %}
+<h2 class="eyebrow eyebrow--rule">[ 02 ] Latest show</h2>
+<a class="feature" href="/concerts/{{ featured.id }}" style="--glow: {{ concert_glow(featured.id) }}">
+  <div class="feature-img" {% if featured.cover_thumbnail_key %}style="background-image:url('{{ media_url(featured.cover_thumbnail_key) }}')"{% endif %}>
+    <div class="feature-grad"></div>
+    {% if featured.is_demo %}<span class="chip-demo chip">demo</span>{% endif %}
+    {% if featured.performed_on %}<span class="stamp stamp--right">{{ featured.performed_on.strftime("%d·%m·%y") }}</span>{% endif %}
+  </div>
+  <div class="feature-body">
+    <h3 class="feature-title">{{ featured.title }}</h3>
+    <div class="feature-foot">
+      <span class="serif">{{ featured.venue or featured.artist or "Concert" }}</span>
+      <span class="amber micro-wide">{{ featured.clips|length }} clip{{ "s" if featured.clips|length != 1 }} →</span>
     </div>
-    {% endfor %}
   </div>
-  {% else %}
-  <div class="empty">
-    <p>No concerts yet.</p>
-    <a class="btn btn-accent" href="/upload">Upload your first clip</a>
-  </div>
-  {% endif %}
-</section>
+</a>
+
+{% if concerts|length > 1 %}
+<h2 class="eyebrow eyebrow--rule">[ 03 ] Archive</h2>
+<div>
+  {% for concert in concerts[1:] %}
+  <a class="archive-row" href="/concerts/{{ concert.id }}" style="--accent: {{ concert_glow(concert.id) }}; animation-delay: {{ loop.index0 * 60 }}ms">
+    <div class="archive-thumb" {% if concert.cover_thumbnail_key %}style="background-image:url('{{ media_url(concert.cover_thumbnail_key) }}')"{% endif %}></div>
+    <div>
+      <h3 class="archive-title">{{ concert.title }}</h3>
+      <p class="archive-sub serif">{{ concert.venue or concert.artist or "Concert" }}{% if concert.performed_on %} · {{ concert.performed_on.strftime("%d %b %y") }}{% endif %}</p>
+    </div>
+    <span class="archive-count">{{ "%02d"|format(concert.clips|length) }}<br />clips</span>
+  </a>
+  {% endfor %}
+</div>
+{% endif %}
+{% else %}
+<div class="empty">
+  <p>No concerts yet.</p>
+  <a class="btn btn-accent" href="/upload">Upload your first clip</a>
+</div>
+{% endif %}
 {% endblock %}
