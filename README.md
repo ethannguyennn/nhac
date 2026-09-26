@@ -88,7 +88,7 @@ nhac/
 │   ├── routers/           # api.py (JSON) · web.py (HTML + /play theater)
 │   ├── templates/  static/# Jinja2 UI + CSS/JS (incl. theater player)
 │   └── uploads.py         # upload orchestration
-├── scripts/               # seed_demo.py · build_highlights.py (backfill)
+├── scripts/               # seed_demo.py · build_highlights.py (backfill) · retry_fingerprints.py
 ├── tests/                 # pytest
 └── docs/                  # architecture, roadmap, workflows, decisions, setup, legal, notes
 ```

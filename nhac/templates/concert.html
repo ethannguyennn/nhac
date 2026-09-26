@@ -23,12 +23,14 @@
   </div>
 </div>
 
-{% if clips %}
 <div class="cta-row">
+  {% if clips %}
   <a class="btn btn-solid" href="/concerts/{{ concert.id }}/play">▶ Start the show</a>
   <a class="btn-square" href="/concerts/{{ concert.id }}/play?hype=1" title="Hype cut — best moments only">⚡</a>
+  {% endif %}
+  <a class="btn {{ 'btn-accent' if not clips else 'btn-square' }}" href="/concerts/{{ concert.id }}/upload"
+     title="Add clips to this show">{{ '+ Add clips' if not clips else '+' }}</a>
 </div>
-{% endif %}
 
 <div class="sec-head sec-head--rule">
   <h2 class="eyebrow">Setlist · your clips</h2>

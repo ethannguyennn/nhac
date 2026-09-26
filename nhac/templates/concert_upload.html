@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}Add clips · {{ concert.title }} · {{ app_name }}{% endblock %}
+{% block content %}
+<a class="backbar backbar--gap" href="/concerts/{{ concert.id }}">← {{ concert.title }}</a>
+
+<h1 class="display" style="margin-top: 24px">Add clips<br />to the show</h1>
+<p class="lede serif">
+  Filed under <b>{{ concert.artist or concert.title }}</b>{% if concert.performed_on %} ·
+  {{ concert.performed_on.strftime("%B %d, %Y") }}{% endif %}. Every clip you drop here goes
+  straight into this show — even the ones we can't name.
+</p>
+
+<form id="bulk-upload-form" action="/concerts/{{ concert.id }}/upload" method="post" enctype="multipart/form-data">
+  <label class="drop" for="bulk-file-input" id="bulkDropZone">
+    <input id="bulk-file-input" name="files" type="file" accept="video/*" multiple required hidden />
+    <div class="drop-label">Drop zone</div>
+    <div class="drop-title" id="bulk-dz-label">Drop all your<br />clips from this show</div>
+    <div class="drop-foot">mp4 · mov · webm — up to 500&nbsp;MB each, or tap to browse</div>
+  </label>
+
+  <button id="bulk-submit-btn" class="btn btn-accent btn-block" type="submit" disabled>
+    Add clips
+  </button>
+
+  <div id="bulk-progress" class="panel is-hidden">
+    <div class="eq eq--big"><b></b><b></b><b></b><b></b><b></b><b></b><b></b><b></b></div>
+    <div class="panel-title" id="bulk-progress-text">Filing them in one by one</div>
+    <div class="panel-foot">Longer with more clips — hang tight · <span class="amber">working</span></div>
+  </div>
+</form>
+{% endblock %}
+{% block scripts %}
+<script src="/static/js/app.js"></script>
+<script>Nhac.initBulkUpload();</script>
+{% endblock %}

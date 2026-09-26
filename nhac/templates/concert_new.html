@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block title %}New concert · {{ app_name }}{% endblock %}
+{% block content %}
+<a class="backbar backbar--gap" href="/">← All shows</a>
+
+<h1 class="display" style="margin-top: 24px">Name<br />the show</h1>
+<p class="lede serif">Tell us who you saw and we'll file every clip you add under it — no guessing per clip.</p>
+
+{% if error %}<div class="flash flash-error">{{ error }}</div>{% endif %}
+
+<form action="/concerts/new" method="post" class="stack">
+  <label class="field">
+    <span>Artist</span>
+    <input name="artist" type="text" required autofocus placeholder="e.g. Phoenix" />
+  </label>
+  <label class="field">
+    <span>Show title <span class="dim">(optional — defaults to the artist)</span></span>
+    <input name="title" type="text" placeholder="e.g. Phoenix at the Greek" />
+  </label>
+  <label class="field">
+    <span>Venue <span class="dim">(optional)</span></span>
+    <input name="venue" type="text" placeholder="e.g. Greek Theatre" />
+  </label>
+  <label class="field">
+    <span>City <span class="dim">(optional)</span></span>
+    <input name="city" type="text" placeholder="e.g. Los Angeles, CA" />
+  </label>
+  <label class="field">
+    <span>Date <span class="dim">(optional — defaults to today)</span></span>
+    <input name="performed_on" type="date" />
+  </label>
+  <button class="btn btn-accent btn-block" type="submit">Next: add clips →</button>
+</form>
+{% endblock %}

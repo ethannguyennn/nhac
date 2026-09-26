@@ -41,6 +41,37 @@ window.Nhac = (function () {
     });
   }
 
+  /** Bulk-upload page (name-the-concert-first flow): enable submit once
+   * files are picked, show a per-file count, and a processing state on
+   * submit. Mirrors initUpload but for a multi-file <input>. */
+  function initBulkUpload() {
+    const input = document.getElementById("bulk-file-input");
+    const label = document.getElementById("bulk-dz-label");
+    const dz = document.getElementById("bulkDropZone");
+    const btn = document.getElementById("bulk-submit-btn");
+    const form = document.getElementById("bulk-upload-form");
+    const progress = document.getElementById("bulk-progress");
+    const statusText = document.getElementById("bulk-progress-text");
+    if (!input || !form) return;
+
+    input.addEventListener("change", function () {
+      const n = input.files ? input.files.length : 0;
+      if (n > 0) {
+        label.textContent = n === 1 ? input.files[0].name : n + " clips selected";
+        dz.classList.add("has-file");
+        btn.disabled = false;
+      }
+    });
+
+    form.addEventListener("submit", function () {
+      btn.disabled = true;
+      btn.classList.add("is-hidden");
+      progress.classList.remove("is-hidden");
+      const n = input.files ? input.files.length : 0;
+      statusText.textContent = "Filing " + n + " clip" + (n === 1 ? "" : "s") + " into the show";
+    });
+  }
+
   /** Player page: audio-reactive visualizer behind the video (warm bars). */
   function initVisualizer() {
     const video = document.getElementById("clip-video");
@@ -106,5 +137,5 @@ window.Nhac = (function () {
     draw(); // idle gradient before playback
   }
 
-  return { initUpload: initUpload, initVisualizer: initVisualizer };
+  return { initUpload: initUpload, initBulkUpload: initBulkUpload, initVisualizer: initVisualizer };
 })();

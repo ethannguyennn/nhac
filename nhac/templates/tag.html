@@ -12,12 +12,18 @@
   {% endif %}
   <div class="stub-body">
     <h1 class="stub-title">What was<br />this one?</h1>
+    {% if clip.concert and clip.concert.artist %}
+    <p class="stub-lede serif">Couldn't hear it over the crowd — but we know it's {{ clip.concert.artist }}. Just the song title, then.</p>
+    {% else %}
     <p class="stub-lede serif">Couldn't hear it over the crowd.</p>
+    {% endif %}
 
     <form action="/clips/{{ clip.id }}/tag" method="post" class="stack">
       <label class="field">
         <span>Artist</span>
-        <input name="artist" type="text" required value="{{ clip.manual_artist or '' }}" placeholder="e.g. Phoenix" />
+        <input name="artist" type="text" required
+               value="{{ clip.manual_artist or (clip.concert.artist if clip.concert else '') or '' }}"
+               placeholder="e.g. Phoenix" />
       </label>
       <label class="field">
         <span>Song title</span>

@@ -4,13 +4,14 @@ from __future__ import annotations
 
 import zlib
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
 
 from nhac.enums import ClipStatus
 from nhac.models import Clip, Concert
+from nhac.services.playlists import ensure_concert_playlist
 
 # Stage-light palette a concert's accent color is deterministically drawn
 # from (by hashing its id) — gives the library visual variety without
@@ -90,6 +91,45 @@ def list_concerts(session: Session, owner_id: str) -> list[Concert]:
         .order_by(Concert.created_at.desc())
     )
     return list(session.scalars(stmt).unique())
+
+
+def create_concert(
+    session: Session,
+    *,
+    owner_id: str,
+    artist: str,
+    title: str | None = None,
+    venue: str | None = None,
+    city: str | None = None,
+    performed_on: date | None = None,
+) -> Concert:
+    """Manually name a show before any clip exists for it.
+
+    The normal path (``pipeline.organize.auto_group_into_concert``) infers a
+    concert from a clip's fingerprinted artist + date; this is the other
+    direction — the user already knows which show this was, so create it
+    first and attach clips to it directly (see ``uploads.ingest_upload``'s
+    ``concert_id`` parameter). Knowing the artist up front also means the
+    manual-tag fallback only has to ask for a song title, not an artist too.
+
+    Eagerly creates the concert's playlist (``ensure_concert_playlist``
+    normally only runs once a clip lands) so the upload page has somewhere
+    to send clips to immediately, before the first one finishes processing.
+    """
+    concert = Concert(
+        owner_id=owner_id,
+        title=title or artist,
+        artist=artist,
+        venue=venue,
+        city=city,
+        performed_on=performed_on or date.today(),
+    )
+    session.add(concert)
+    session.flush()
+    ensure_concert_playlist(session, concert)
+    session.commit()
+    session.refresh(concert)
+    return concert
 
 
 def get_concert(session: Session, concert_id: str) -> Concert | None:

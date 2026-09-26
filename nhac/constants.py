@@ -23,6 +23,22 @@ ALLOWED_VIDEO_EXT = (".mp4", ".mov", ".webm", ".m4v")
 FINGERPRINT_SAMPLE_SECONDS = 15
 FINGERPRINT_SAMPLE_START_SECONDS = 5
 
+# Fingerprint provider network behavior.
+#
+# `audd` and `acoustid` are HTTP calls to someone else's server, so they fail
+# in ways the clip is not responsible for: a timeout, a 502 from a proxy, a
+# rate-limit burst. Those get a bounded retry with exponential backoff; when
+# the budget runs out the clip degrades to the manual-tag path rather than
+# failing (see pipeline/process_clip.py).
+#
+# The retry happens INLINE in the upload request, so the worst-case added
+# latency (sum of the backoffs below) must stay small enough that a user
+# holding a phone doesn't give up: 0.5s + 1.0s = 1.5s at the default budget.
+FINGERPRINT_HTTP_TIMEOUT_SECONDS = 30.0
+FINGERPRINT_MAX_ATTEMPTS = 3
+FINGERPRINT_RETRY_BASE_DELAY_SECONDS = 0.5
+FINGERPRINT_RETRY_MAX_DELAY_SECONDS = 4.0
+
 # ffmpeg/ffprobe subprocess timeouts (seconds).
 #
 # Without these, a malformed, truncated, or pathologically large input can hang

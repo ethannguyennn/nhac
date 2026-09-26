@@ -44,7 +44,9 @@ production hardening.
    (`run_in_threadpool`) so ffmpeg/network don't block the event loop.
 3. **`pipeline/process_clip`** (its own DB session): probe → thumbnail → extract
    audio sample → fingerprint → log `Recognition` → upsert `Song` + link `Clip`
-   → `organize`.
+   → `organize`. A provider that can't be reached (after bounded retries)
+   degrades the clip to `unidentified` with a dead-letter `Recognition`,
+   rather than failing it.
 4. **`pipeline/organize`** groups the clip into a `Concert` (by artist + date)
    and its auto `Playlist`.
 5. The route redirects (web) or returns the clip + result (API).
@@ -59,7 +61,7 @@ production hardening.
 | `storage/`            | `Storage` protocol + `local` and `s3` backends             |
 | `audio/ffmpeg.py`     | probe, extract audio sample, thumbnail, quality estimate   |
 | `analysis/`           | excitement detection: flash (luma Δ) + loudness (RMS) → highlights |
-| `fingerprint/`        | `Fingerprinter` ABC + `mock`/`audd`/`acoustid` + registry  |
+| `fingerprint/`        | `Fingerprinter` ABC + `mock`/`audd`/`acoustid` + registry; `retry.py` adds backoff/classification around network providers |
 | `pipeline/`           | `process_clip` + `organize` + `montage` (hype-cut render)  |
 | `services/`           | Focused DB logic: clips, songs, concerts, playlists, playback, users |
 | `routers/`            | `api` (JSON under `/api`) and `web` (HTML pages + `/play` theater) |
@@ -76,7 +78,9 @@ playlists · playlist_items · favorites`
 
 `clips` is the hub: it points at a `song` (once identified) and a `concert`
 (once grouped); each fingerprint attempt is recorded in `recognitions` for
-audit/debug. Enum values live in `nhac/enums.py`.
+audit/debug — including the ones where the provider never answered, whose
+`error` column makes `recognitions` double as a dead-letter queue
+(`services.clips.list_provider_failures`). Enum values live in `nhac/enums.py`.
 
 ## Concurrency & the pipeline
 
