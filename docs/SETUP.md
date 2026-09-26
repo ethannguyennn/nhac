@@ -66,6 +66,24 @@ NHAC_FINGERPRINT_PROVIDER=acoustid
 NHAC_ACOUSTID_API_KEY=your-key
 ```
 
+**When the provider is down.** Both of these are calls to someone else's
+server, so plan for them being unreachable. Transient failures (timeout,
+connection, 5xx, 429) are retried with backoff; if the provider still can't
+be reached the clip is filed as `unidentified` — the normal manual-tag path —
+and the attempt is kept as a dead-letter row. Replay the backlog once the
+provider is healthy:
+
+```bash
+.venv\Scripts\python.exe scriptsetry_fingerprints.py         # show the backlog
+.venv\Scripts\python.exe scriptsetry_fingerprints.py --run   # retry it
+```
+
+It re-sends each clip's stored audio sample, so a replay costs one API call
+per clip and no ffmpeg. Clips whose failure a retry can't fix (a rejected API
+key, say) are skipped unless you pass `--all`; fix the key first. Tune the
+budgets with `FINGERPRINT_MAX_ATTEMPTS` / `FINGERPRINT_RETRY_BASE_DELAY_SECONDS`
+in `nhac/constants.py`.
+
 ### Use Cloudflare R2 / S3 storage
 
 ```bash

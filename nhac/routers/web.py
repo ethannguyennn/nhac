@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from datetime import date
 
 from fastapi import APIRouter, Depends, Form, Request, UploadFile
 from fastapi.responses import HTMLResponse, RedirectResponse
@@ -41,6 +42,102 @@ def index(
 @router.get("/upload", response_class=HTMLResponse)
 def upload_form(request: Request) -> HTMLResponse:
     return templates.TemplateResponse(request, "upload.html", {})
+
+
+@router.get("/concerts/new", response_class=HTMLResponse)
+def new_concert_form(request: Request) -> HTMLResponse:
+    return templates.TemplateResponse(request, "concert_new.html", {})
+
+
+@router.post("/concerts/new")
+def new_concert_submit(
+    request: Request,
+    artist: str = Form(...),
+    title: str | None = Form(None),
+    venue: str | None = Form(None),
+    city: str | None = Form(None),
+    performed_on: str | None = Form(None),
+    session: Session = Depends(get_session),
+    user: User = Depends(get_current_user),
+):
+    parsed_date: date | None = None
+    if performed_on:
+        try:
+            parsed_date = date.fromisoformat(performed_on)
+        except ValueError:
+            return templates.TemplateResponse(
+                request, "concert_new.html", {"error": "That date didn't parse."},
+                status_code=422,
+            )
+    concert = concert_service.create_concert(
+        session,
+        owner_id=user.id,
+        artist=artist.strip(),
+        title=(title or "").strip() or None,
+        venue=(venue or "").strip() or None,
+        city=(city or "").strip() or None,
+        performed_on=parsed_date,
+    )
+    return RedirectResponse(f"/concerts/{concert.id}/upload", status_code=303)
+
+
+@router.get("/concerts/{concert_id}/upload", response_class=HTMLResponse)
+def concert_upload_form(
+    concert_id: str,
+    request: Request,
+    session: Session = Depends(get_session),
+) -> HTMLResponse:
+    concert = concert_service.get_concert(session, concert_id)
+    if concert is None:
+        return RedirectResponse("/?msg=Concert+not+found", status_code=303)
+    return templates.TemplateResponse(request, "concert_upload.html", {"concert": concert})
+
+
+@router.post("/concerts/{concert_id}/upload")
+async def concert_upload_submit(
+    concert_id: str,
+    request: Request,
+    files: list[UploadFile],
+    session: Session = Depends(get_session),
+    user: User = Depends(get_current_user),
+):
+    concert = concert_service.get_concert(session, concert_id)
+    if concert is None:
+        return RedirectResponse("/?msg=Concert+not+found", status_code=303)
+
+    identified = unidentified = failed = 0
+    for file in files:
+        data = await file.read()
+        if not data:
+            continue  # an empty extra <input> slot from the multi-file picker
+        try:
+            _clip, result = await ingest_upload(
+                session,
+                uploader_id=user.id,
+                filename=file.filename or "clip.mp4",
+                content_type=file.content_type,
+                data=data,
+                concert_id=concert_id,
+            )
+        except UploadError:
+            failed += 1
+            continue
+        if result.status is ClipStatus.IDENTIFIED:
+            identified += 1
+        elif result.status is ClipStatus.FAILED:
+            failed += 1
+        else:
+            unidentified += 1
+
+    parts = []
+    if identified:
+        parts.append(f"{identified} identified")
+    if unidentified:
+        parts.append(f"{unidentified} need{'s' if unidentified == 1 else ''} a name")
+    if failed:
+        parts.append(f"{failed} failed")
+    summary = ", ".join(parts) or "Nothing uploaded"
+    return RedirectResponse(f"/concerts/{concert_id}?msg={_q(summary)}", status_code=303)
 
 
 @router.post("/upload")

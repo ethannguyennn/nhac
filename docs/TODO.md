@@ -33,10 +33,35 @@ are roughly ordered by "matters before anyone but you uses this."
       WARNING *with the key* so a sweep job has something to work from.
       Pinned by `tests/test_upload_failure_cleanup.py` (7 tests; the 3 orphan
       ones verified to fail against pre-fix behaviour).
-- [ ] **Retry / dead-letter for fingerprint provider errors**: `audd`/`acoustid`
-      are network calls — confirm a timeout or 5xx from the provider doesn't
-      crash the pipeline thread; it should fall back to `unidentified` (manual
-      tag path), not surface a 500 to the uploader.
+- [x] **Retry / dead-letter for fingerprint provider errors** — DONE. It did
+      not crash the thread or 500 the uploader (the catch-all handler caught
+      it), but it did something worse than either: it marked the clip
+      **`failed`**. That's a dead end — no route to the manual-tag page the
+      "we didn't recognize it" path offers — and because the handler rolls
+      back, the orphan sweep then deleted the thumbnail AND the audio sample,
+      i.e. the very sample any retry would need. One 503 from AudD
+      permanently cost a good clip, and left no record that a provider was
+      ever involved — the clip sat in the `failed` pile, unsweepable and
+      indistinguishable from a genuine transcode failure.
+      Three parts now: (1) `fingerprint/retry.py`'s `RetryingFingerprinter`,
+      applied **in the registry** so every network provider inherits it,
+      retries only what a retry could fix (timeouts, connection errors, 5xx,
+      429) with exponential backoff (`FINGERPRINT_*` budgets in
+      `constants.py`, ~1.5s worst case since it runs inline in the upload) and
+      normalizes the rest into `FingerprintUnavailable`; a clean "no match" is
+      an *answer* and is never retried. (2) `process_clip` degrades an
+      unreachable provider to **`unidentified`** and **commits** instead of
+      rolling back, so the derived artifacts survive. (3) the attempt is kept
+      as a dead-letter `Recognition` row (`error`, plus `attempts`/`transient`
+      in `raw_response`); `services.clips.list_provider_failures` is the
+      queue and `scripts/retry_fingerprints.py` replays it through
+      `process_clip.retry_fingerprint`, which re-sends the *stored* sample —
+      no ffmpeg, no re-analysis. Only the **latest** attempt decides
+      membership, so a clip leaves the queue once the provider answers (even
+      with a miss) and rejoins it if a later retry hits an outage. A retry
+      never overwrites a manual tag. Pinned by
+      `tests/test_fingerprint_failures.py` (37 tests; the 13 pipeline/queue
+      ones verified to fail against pre-fix behaviour).
 - [x] **ffmpeg subprocess timeouts** — DONE. All 4 call sites
       (`audio/ffmpeg.py` `_run` + `estimate_audio_quality`,
       `analysis/excitement.py` `_run_metadata_pass`, `pipeline/montage.py`
@@ -75,9 +100,14 @@ are roughly ordered by "matters before anyone but you uses this."
 - [ ] Storage backend tests for `s3`/R2 adapter (currently only exercised
       manually, if at all — `local` is what the suite covers).
 - [ ] `organize` edge cases from section 1 above, as explicit test cases.
-- [ ] Fingerprint provider adapters (`audd.py`, `acoustid.py`) — mock the HTTP
-      layer and test timeout/error/malformed-response handling, not just the
-      `mock` provider.
+- [~] Fingerprint provider adapters (`audd.py`, `acoustid.py`) — timeout /
+      5xx / 429 / 4xx / malformed-response handling is covered at the
+      `RetryingFingerprinter` boundary every provider is wrapped in
+      (`tests/test_fingerprint_failures.py`). Still untested: each adapter's
+      own **response parsing** (AudD's `apple_music` artwork rewrite and
+      spotify/apple id extraction, AcoustID's best-score pick and artist
+      join) — mock the HTTP layer and assert the `FingerprintMatch` they
+      build.
 - [ ] Upload rejection paths: oversized file, disallowed MIME/extension,
       corrupt video ffmpeg can't probe — confirm each returns a clean 4xx with
       a useful message, not a 500.

@@ -24,7 +24,23 @@ def auto_group_into_concert(session: Session, clip: Clip) -> str | None:
     """Attach ``clip`` to a concert (creating one if needed). Returns concert id.
 
     No-ops if the clip has no known artist yet (stays ungrouped until tagged).
+
+    If ``clip.concert_id`` is already set, the user named the show up front
+    (``services.concerts.create_concert`` + ``uploads.ingest_upload``'s
+    ``concert_id``) — that assignment is authoritative and is never
+    second-guessed by whatever the fingerprint or a later manual tag says the
+    artist is. Playlist membership is still ensured here defensively (in case
+    a caller set ``concert_id`` directly rather than through
+    ``ingest_upload``, which normally does this at upload time already).
     """
+    if clip.concert_id:
+        concert = session.get(Concert, clip.concert_id)
+        if concert is not None:
+            playlist = ensure_concert_playlist(session, concert)
+            add_clip_to_playlist(session, playlist, clip.id)
+            return concert.id
+        log.warning("clip %s has a dangling concert_id %s; re-grouping", clip.id, clip.concert_id)
+
     artist = clip.display_artist
     if not artist:
         log.info("clip %s has no artist yet; leaving ungrouped", clip.id)

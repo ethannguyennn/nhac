@@ -61,10 +61,21 @@ upload → uploads.ingest_upload → pipeline.process_clip (own DB session, runs
     4. ffmpeg.estimate_audio_quality (best-effort)
     4.5 analysis.excitement.analyze_and_store → clip_highlights rows
     5. fingerprint.identify(sample)  [mock | audd | acoustid, via NHAC_FINGERPRINT_PROVIDER]
+         network providers are wrapped in RetryingFingerprinter (backoff on
+         timeouts/5xx/429); unreachable → status=unidentified + dead-letter row
     6. write Recognition row
     7. confident? → upsert Song, link Clip, organize.auto_group_into_concert
               : → status=unidentified, user manually tags via /clips/<id>/tag
 ```
+
+Naming the show first (`services.concerts.create_concert` + `POST
+/concerts/new` or `/api/concerts`, then bulk `POST /concerts/<id>/upload` or
+`/api/concerts/<id>/clips`): each clip is pre-assigned `concert_id` and
+attached to that concert's playlist BEFORE the pipeline runs, so it lands
+there whether it identifies, misses, or the provider is down. Step 7's
+`auto_group_into_concert` then short-circuits — it never moves a
+pre-assigned clip based on what the fingerprint or a later manual tag says
+the artist is (see the gotcha below).
 
 Theater mode (`/play/<playlist_id>`): `services/playback.build_queue` resolves
 a playlist into a JSON queue (media/montage/thumbnail URLs + highlight
@@ -89,7 +100,7 @@ Module map:
 | `storage/` | `Storage` protocol; `local` (default) and `s3` (R2/S3) backends |
 | `audio/ffmpeg.py` | probe, extract audio sample, thumbnail, quality estimate |
 | `analysis/excitement.py` | flash (luma-delta) + loudness (RMS) → highlight segments |
-| `fingerprint/` | `Fingerprinter` ABC + `mock`/`audd`/`acoustid` + registry |
+| `fingerprint/` | `Fingerprinter` ABC + `mock`/`audd`/`acoustid` + registry; `retry.py` wraps network providers with backoff + `FingerprintUnavailable` |
 | `pipeline/` | `process_clip`, `organize` (concert/playlist grouping), `montage` (hype cut) |
 | `services/` | DB-facing logic: clips, songs, concerts, playlists, playback, users |
 | `routers/api.py` | JSON API (`/api/...`) |
@@ -110,6 +121,22 @@ Module map:
   derived key and, after committing the terminal state, deletes the ones the
   persisted row doesn't reference (`_discard_unreferenced`). Add any new
   derived artifact to that list — the raw upload deliberately stays.
+- **A provider error is never a clip failure.** `audd`/`acoustid` are calls
+  to someone else's server; when one is unreachable the clip degrades to
+  `unidentified` (the manual-tag path) and `_record_provider_failure`
+  **commits** rather than rolling back — that commit is what keeps the
+  thumbnail and audio sample from being swept as orphans, and the sample is
+  exactly what `retry_fingerprint` re-sends later. Don't "simplify" that back
+  into the generic failure handler. The attempt is kept as a dead-letter
+  `Recognition` row (`error` set); `scripts/retry_fingerprints.py` replays
+  the queue.
+- **A pre-assigned concert is never second-guessed.** Once a clip has
+  `concert_id` set (from naming the show first — see above),
+  `organize.auto_group_into_concert` treats it as authoritative: a confident
+  fingerprint match for a different artist, or a later manual tag with a
+  different artist, records that song/artist on the clip but never moves it
+  to a different concert. Don't "fix" that by re-deriving the concert from
+  whatever the artist field says.
 - **Single-user MVP.** `deps.get_current_user` always returns one seeded
   local account (`services/users.get_or_create_default_user`). There is no
   real auth yet — don't assume multi-user isolation.

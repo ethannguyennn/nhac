@@ -12,6 +12,7 @@ from pathlib import Path
 import httpx
 
 from nhac.config import settings
+from nhac.constants import FINGERPRINT_HTTP_TIMEOUT_SECONDS
 from nhac.fingerprint.base import Fingerprinter, FingerprintMatch
 from nhac.logging_config import get_logger
 
@@ -44,7 +45,7 @@ class AcoustIDFingerprinter(Fingerprinter):
             "fingerprint": fingerprint,
             "meta": "recordings+releasegroups",
         }
-        resp = httpx.post(_LOOKUP_URL, data=params, timeout=30.0)
+        resp = httpx.post(_LOOKUP_URL, data=params, timeout=FINGERPRINT_HTTP_TIMEOUT_SECONDS)
         resp.raise_for_status()
         payload = resp.json()
 

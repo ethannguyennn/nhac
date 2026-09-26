@@ -12,6 +12,7 @@ from pathlib import Path
 import httpx
 
 from nhac.config import settings
+from nhac.constants import FINGERPRINT_HTTP_TIMEOUT_SECONDS
 from nhac.fingerprint.base import Fingerprinter, FingerprintMatch
 from nhac.logging_config import get_logger
 
@@ -32,7 +33,9 @@ class AudDFingerprinter(Fingerprinter):
         with audio_path.open("rb") as fh:
             files = {"file": (audio_path.name, fh, "audio/mpeg")}
             data = {"api_token": self._token, "return": "apple_music,spotify"}
-            resp = httpx.post(_ENDPOINT, data=data, files=files, timeout=30.0)
+            resp = httpx.post(
+                _ENDPOINT, data=data, files=files, timeout=FINGERPRINT_HTTP_TIMEOUT_SECONDS
+            )
         resp.raise_for_status()
         payload = resp.json()
 

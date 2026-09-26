@@ -46,7 +46,10 @@
 
 {% if concerts %}
 {% set featured = concerts[0] %}
-<h2 class="eyebrow eyebrow--rule">[ 02 ] Latest show</h2>
+<div class="sec-head sec-head--rule">
+  <h2 class="eyebrow">[ 02 ] Latest show</h2>
+  <a class="micro-wide amber" href="/concerts/new">+ Name a show</a>
+</div>
 <a class="feature" href="/concerts/{{ featured.id }}" style="--glow: {{ concert_glow(featured.id) }}">
   <div class="feature-img" {% if featured.cover_thumbnail_key %}style="background-image:url('{{ media_url(featured.cover_thumbnail_key) }}')"{% endif %}>
     <div class="feature-grad"></div>
@@ -80,7 +83,8 @@
 {% else %}
 <div class="empty">
   <p>No concerts yet.</p>
-  <a class="btn btn-accent" href="/upload">Upload your first clip</a>
+  <a class="btn btn-accent" href="/concerts/new">Name your first show</a>
+  <a class="btn" href="/upload">…or just upload a clip and we'll figure it out</a>
 </div>
 {% endif %}
 {% endblock %}

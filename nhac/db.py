@@ -39,6 +39,7 @@ SessionLocal = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False
 # (A production deploy would use Alembic; this keeps local DBs working.)
 _ADDED_COLUMNS: dict[str, dict[str, str]] = {
     "clips": {"montage_key": "TEXT"},
+    "recognitions": {"error": "TEXT"},
 }
 
 

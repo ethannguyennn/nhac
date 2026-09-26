@@ -12,6 +12,7 @@ from nhac.pipeline.montage import MontageError, build_montage
 from nhac.schemas import (
     ClipDetailOut,
     ClipOut,
+    ConcertCreateIn,
     ConcertOut,
     ConcertWithClipsOut,
     MontageOut,
@@ -96,6 +97,25 @@ def list_concerts(
     return [ConcertOut.model_validate(c) for c in concerts]
 
 
+@router.post("/concerts", response_model=ConcertOut, status_code=201)
+def create_concert(
+    body: ConcertCreateIn,
+    session: Session = Depends(get_session),
+    user: User = Depends(get_current_user),
+) -> ConcertOut:
+    """Name a show before any clip exists for it (see docs/WORKFLOWS.md §1b)."""
+    concert = concert_service.create_concert(
+        session,
+        owner_id=user.id,
+        artist=body.artist,
+        title=body.title,
+        venue=body.venue,
+        city=body.city,
+        performed_on=body.performed_on,
+    )
+    return ConcertOut.model_validate(concert)
+
+
 @router.get("/concerts/{concert_id}", response_model=ConcertWithClipsOut)
 def get_concert(
     concert_id: str,
@@ -105,6 +125,47 @@ def get_concert(
     if concert is None:
         raise HTTPException(status_code=404, detail="concert not found")
     return ConcertWithClipsOut.model_validate(concert)
+
+
+@router.post("/concerts/{concert_id}/clips", response_model=list[UploadResultOut], status_code=201)
+async def upload_clips_to_concert(
+    concert_id: str,
+    files: list[UploadFile] = File(...),
+    session: Session = Depends(get_session),
+    user: User = Depends(get_current_user),
+) -> list[UploadResultOut]:
+    """Bulk-add clips to a concert the user already named.
+
+    Each file goes through the same pipeline as a single upload (probe,
+    thumbnail, fingerprint, excitement analysis) — the only difference is
+    grouping is fixed up front instead of inferred, so a clip lands here
+    whether it identifies, misses, or the fingerprint provider is
+    unreachable. Processed sequentially (not concurrently): the pipeline
+    already runs each file in a threadpool, and doing several ffmpeg decodes
+    at once on one request would just contend for the same CPU.
+    """
+    results: list[UploadResultOut] = []
+    for file in files:
+        data = await file.read()
+        try:
+            clip, result = await ingest_upload(
+                session,
+                uploader_id=user.id,
+                filename=file.filename or "clip.mp4",
+                content_type=file.content_type,
+                data=data,
+                concert_id=concert_id,
+            )
+        except UploadError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        results.append(
+            UploadResultOut(
+                clip=ClipOut.model_validate(clip),
+                identified=result.identified,
+                message=result.message,
+            )
+        )
+    return results
 
 
 # ---- Playback / theater mode ----

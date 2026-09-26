@@ -216,6 +216,16 @@ class ClipHighlight(Base, TimestampMixin):
 
 
 class Recognition(Base, TimestampMixin):
+    """One recognition ATTEMPT, successful or not.
+
+    A row with ``error`` set is a dead letter: the provider never answered
+    (timeout, 5xx, rate limit, bad key), so the clip fell back to manual
+    tagging. ``services/clips.list_provider_failures`` reads these, and
+    ``scripts/retry_fingerprints.py`` retries them off the stored audio
+    sample. Keeping the attempt (rather than only successes) is what makes a
+    provider outage recoverable instead of invisible.
+    """
+
     __tablename__ = "recognitions"
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
@@ -228,6 +238,12 @@ class Recognition(Base, TimestampMixin):
     )
     confidence: Mapped[float | None] = mapped_column(Float)
     raw_response: Mapped[dict | None] = mapped_column(JSON)
+    # Set only when the provider could not be asked at all. Deliberately NOT
+    # indexed: the dead-letter sweep reaches these through the already-indexed
+    # ``clip_id``, and db.py's column shim can add columns to an existing dev
+    # DB but not indexes — an index here would exist on fresh databases and
+    # quietly not on older ones.
+    error: Mapped[str | None] = mapped_column(Text)
 
     clip: Mapped[Clip] = relationship(back_populates="recognitions")
 

@@ -74,6 +74,16 @@ class TagClipIn(BaseModel):
     album: str | None = Field(default=None, max_length=300)
 
 
+class ConcertCreateIn(BaseModel):
+    """Name a show before any clip exists for it — see services.concerts.create_concert."""
+
+    artist: str = Field(min_length=1, max_length=300)
+    title: str | None = Field(default=None, max_length=300)
+    venue: str | None = Field(default=None, max_length=300)
+    city: str | None = Field(default=None, max_length=200)
+    performed_on: date | None = None
+
+
 class UploadResultOut(BaseModel):
     clip: ClipOut
     identified: bool
